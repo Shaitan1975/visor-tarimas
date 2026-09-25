@@ -4,7 +4,8 @@
 
 const CONFIG = {
   // 🔴 REEMPLAZA ESTO por la URL de tu Web App de Apps Script
-  APPS_SCRIPT_URL: "PEGA_AQUI_TU_URL_DE_APPS_SCRIPT",
+  APPS_SCRIPT_URL: "https://script.google.com/macros/s/AKfycbwPHb9M_jIVCqQMvTi1JC33B5AY7mYFm1Fbtu9odGaksAjStEvSqOiFl6-7l8GSWxbhJQ/exec
+",
   CLAVE_EMPRESA: "MediesE2026$Almacen",
   SALT_PBKDF2: "salt-fijo-empresa-2026",
   ITERACIONES: 100000,
