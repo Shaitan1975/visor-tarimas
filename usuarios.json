@@ -1,0 +1,16 @@
+[
+  {
+    "user": "ernesto.escobar",
+    "nombre": "Ernesto Escobar",
+    "rol": "supervisor",
+    "salt": "a7f3c9e1b2d4f5a8c6e9b3d1f7a2c4e8",
+    "hash": "9c9e2e1e2b3f6d4e8f7c9a1b2d3e4f5a6c7b8d9e0f1a2b3c4d5e6f7a8b9c0d1e"
+  },
+  {
+    "user": "agustin.canseco",
+    "nombre": "Agustin Canseco",
+    "rol": "gerente",
+    "salt": "b8e4d2f6a9c3e7b1d5f8a2c6e9b3d7f1",
+    "hash": "3b5d7f9a1c3e5f7a9b1d3f5a7c9e1b3d5f7a9c1e3b5d7f9a1c3e5f7a9b1d3f5a"
+  }
+]
