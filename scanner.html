@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1F4E79">
+<title>Visor Tarimas - Escanear</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body class="scanner-body">
+
+<header class="app-header">
+  <div class="header-left">
+    <span class="header-logo">📦</span>
+    <span class="header-title">Visor Tarimas</span>
+  </div>
+  <div class="header-right">
+    <span id="user-info" class="user-info"></span>
+    <button id="btn-logout" class="btn-logout" title="Cerrar sesión">Salir</button>
+  </div>
+</header>
+
+<main class="scanner-main">
+
+  <section id="view-ready" class="view-section">
+    <div class="ready-container">
+      <div class="ready-icon">📷</div>
+      <h2>Listo para escanear</h2>
+      <p>Toca el botón para activar la cámara y escanear el código QR de la etiqueta.</p>
+      <button id="btn-start-scan" class="btn-primary btn-large">🎥 Escanear QR</button>
+    </div>
+  </section>
+
+  <section id="view-scanning" class="view-section hidden">
+    <div class="scanner-viewport">
+      <video id="qr-video" playsinline></video>
+      <div class="scanner-overlay">
+        <div class="scanner-frame"></div>
+      </div>
+    </div>
+    <p class="scanner-hint">Apunta al código QR de la etiqueta</p>
+    <button id="btn-cancel-scan" class="btn-secondary">Cancelar</button>
+  </section>
+
+  <section id="view-loading" class="view-section hidden">
+    <div class="loading-container">
+      <div class="spinner"></div>
+      <p>Descifrando información...</p>
+    </div>
+  </section>
+
+  <section id="view-result" class="view-section hidden">
+    <div class="result-header">
+      <h2 id="result-titulo">Tarima</h2>
+      <p id="result-subtitulo"></p>
+    </div>
+
+    <div class="result-meta">
+      <div class="meta-item">
+        <span class="meta-label">Código OAR</span>
+        <span class="meta-value" id="meta-oar">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Lote</span>
+        <span class="meta-value" id="meta-lote">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Total movimientos</span>
+        <span class="meta-value" id="meta-total">-</span>
+      </div>
+    </div>
+
+    <div class="result-table-wrapper">
+      <table class="result-table">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Movimiento</th>
+            <th>Cantidad</th>
+            <th>Ubicación</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-movimientos"></tbody>
+      </table>
+    </div>
+
+    <div class="result-actions">
+      <button id="btn-send-email" class="btn-primary btn-large">
+        📧 Enviar reporte a gerencia
+      </button>
+      <button id="btn-scan-again" class="btn-secondary">
+        🔄 Escanear otro QR
+      </button>
+    </div>
+
+    <p id="send-status" class="send-status"></p>
+  </section>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="app.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    App.initScanner();
+  });
+</script>
+</body>
+</html>
