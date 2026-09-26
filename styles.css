@@ -305,3 +305,79 @@ html, body {
 .tag-entrada { color: var(--verde-ok); font-weight: 600; }
 .tag-salida { color: var(--azul-claro); font-weight: 600; }
 .tag-devolucion { color: #ED8936; font-weight: 600; }
+
+/* ═══════════════════════════════════════════════════════════
+   TOTALES EN TARJETAS (v3)
+   ═══════════════════════════════════════════════════════════ */
+
+.totales-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 16px;
+  background: white;
+}
+
+.total-card {
+  padding: 16px 8px;
+  border-radius: 10px;
+  text-align: center;
+  border: 2px solid;
+}
+
+.total-card.entrada {
+  background: #E8F5E9;
+  border-color: #4CAF50;
+}
+.total-card.entrada .total-label { color: #2E7D32; }
+.total-card.entrada .total-valor { color: #1B5E20; }
+
+.total-card.consumo {
+  background: #FFF3E0;
+  border-color: #FF9800;
+}
+.total-card.consumo .total-label { color: #E65100; }
+.total-card.consumo .total-valor { color: #BF360C; }
+
+.total-card.saldo {
+  background: #E3F2FD;
+  border-color: #2196F3;
+}
+.total-card.saldo .total-label { color: #0D47A1; }
+.total-card.saldo .total-valor { color: #0D47A1; }
+
+.total-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.total-valor {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.total-unidad {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.extras {
+  background: white;
+  padding: 12px 16px;
+  border-top: 1px solid #E0E4EA;
+  font-size: 12px;
+}
+
+.extra-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+}
+
+.extra-label {
+  color: #4A5568;
+  font-weight: 600;
+}
