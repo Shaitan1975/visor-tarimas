@@ -1,5 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v4)
+// VISOR TARIMAS - LÓGICA DE LA PWA (v5)
+// Detecta el evento según la URL (?lugar=planta, ?lugar=aduana-entrada, etc.)
+// Empresa: Mediese
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -10,7 +12,90 @@ const CONFIG = {
   SESSION_KEY: "visor_tarimas_session"
 };
 
+// Mapeo de lugares a eventos
+const MAPA_LUGARES = {
+  "planta": {
+    evento: "SALIDA_PLANTA",
+    ubicacion: "PLANTA",
+    etiqueta: "🚚 SALIDA DE PLANTA",
+    color: "#1F4E79",
+    colorFondo: "#D9E5F2",
+    icono: "🚚",
+  },
+  "aduana-entrada": {
+    evento: "ADUANA_ENTRADA",
+    ubicacion: "ADUANA",
+    etiqueta: "🛃 ENTRADA A ADUANA",
+    color: "#B8860B",
+    colorFondo: "#FFF8DC",
+    icono: "🛃",
+  },
+  "aduana-salida": {
+    evento: "ADUANA_SALIDA",
+    ubicacion: "EN_TRANSITO",
+    etiqueta: "📦 SALIDA DE ADUANA",
+    color: "#8B4513",
+    colorFondo: "#F5DEB3",
+    icono: "📦",
+  },
+  "cedis": {
+    evento: "ENTREGA_CEDIS",
+    ubicacion: "CEDIS",
+    etiqueta: "✅ ENTREGA EN CEDIS",
+    color: "#1F7A1F",
+    colorFondo: "#D9F0D9",
+    icono: "✅",
+  },
+  "insumos": {
+    // Modo antiguo: solo muestra info sin registrar evento
+    evento: null,
+    ubicacion: "ALMACEN",
+    etiqueta: "📋 CONSULTA DE INSUMOS",
+    color: "#666666",
+    colorFondo: "#F5F5F5",
+    icono: "📋",
+  },
+};
+
 const App = (() => {
+
+  // ═══════════════════════════════════════════════════════════
+  // CONFIGURACIÓN DE MODO (según URL)
+  // ═══════════════════════════════════════════════════════════
+
+  function obtenerModo() {
+    const params = new URLSearchParams(window.location.search);
+    const lugar = params.get("lugar") || "insumos";
+    return MAPA_LUGARES[lugar] || MAPA_LUGARES["insumos"];
+  }
+
+  function aplicarModoVisual(modo) {
+    // Actualizar indicador
+    const indicador = document.getElementById("modo-indicador");
+    const texto = document.getElementById("modo-texto");
+    const icono = document.getElementById("modo-icono");
+
+    if (indicador && texto && icono) {
+      texto.textContent = modo.etiqueta;
+      icono.textContent = modo.icono;
+      indicador.style.background = modo.color;
+      indicador.style.color = "#FFFFFF";
+    }
+
+    // Actualizar textos según modo
+    const readyTitulo = document.getElementById("ready-titulo");
+    const readyDesc = document.getElementById("ready-descripcion");
+
+    if (modo.evento === null) {
+      // Modo insumos: solo consulta
+      if (readyTitulo) readyTitulo.textContent = "Listo para escanear";
+      if (readyDesc) readyDesc.textContent = "Consulta la información de la tarima.";
+    } else {
+      // Modo evento: registra
+      if (readyTitulo) readyTitulo.textContent = modo.etiqueta;
+      if (readyDesc) readyDesc.textContent = `Escanea cada tarima para registrar ${modo.etiqueta.replace(/^[^\s]+\s/, '')}`;
+    }
+  }
 
   // ═══════════════════════════════════════════════════════════
   // SESIÓN
@@ -28,7 +113,7 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // PBKDF2 (mismo que Python)
+  // PBKDF2
   // ═══════════════════════════════════════════════════════════
 
   async function pbkdf2Hash(password, saltHex) {
@@ -68,7 +153,7 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // DESCIFRADO AES-256-CBC
+  // DESCIFRADO
   // ═══════════════════════════════════════════════════════════
 
   function descifrarBlobQR(blobB64, password) {
@@ -106,7 +191,9 @@ const App = (() => {
 
   function initLogin() {
     if (getSession()) {
-      window.location.href = "scanner.html";
+      // Preservar el parámetro ?lugar= al redirigir
+      const params = window.location.search;
+      window.location.href = "scanner.html" + params;
       return;
     }
     const form = document.getElementById("login-form");
@@ -123,7 +210,8 @@ const App = (() => {
       const user = await verificarUsuario(usuario, password);
       if (user) {
         setSession(user);
-        window.location.href = "scanner.html";
+        const params = window.location.search;
+        window.location.href = "scanner.html" + params;
       } else {
         errorMsg.textContent = "Usuario o contraseña incorrectos";
         btn.disabled = false;
@@ -138,14 +226,18 @@ const App = (() => {
 
   let stream = null;
   let scanning = false;
-  let datosActuales = null;
+  let modoActual = null;
 
   function initScanner() {
     const session = getSession();
     if (!session) {
-      window.location.href = "index.html";
+      const params = window.location.search;
+      window.location.href = "index.html" + params;
       return;
     }
+
+    modoActual = obtenerModo();
+    aplicarModoVisual(modoActual);
 
     document.getElementById("user-info").textContent =
       `${session.nombre} (${session.rol})`;
@@ -158,14 +250,14 @@ const App = (() => {
     document.getElementById("btn-start-scan").addEventListener("click", iniciarCamara);
     document.getElementById("btn-cancel-scan").addEventListener("click", cancelarCamara);
     document.getElementById("btn-scan-again").addEventListener("click", () => {
-      datosActuales = null;
       document.getElementById("send-status").textContent = "";
       mostrarVista("view-ready");
     });
-    document.getElementById("btn-send-email").addEventListener("click", enviarCorreo);
 
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("sw.js").catch(() => {});
+      navigator.serviceWorker.register("sw.js").then(reg => {
+        reg.update().catch(() => {});
+      }).catch(() => {});
     }
   }
 
@@ -227,86 +319,77 @@ const App = (() => {
     requestAnimationFrame(tick);
   }
 
-  function procesarQR(blobCifrado) {
-    console.log("🔍 BLOB LEÍDO:", blobCifrado);
-    console.log("🔍 LONGITUD:", blobCifrado.length);
+  async function procesarQR(blobCifrado) {
     mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Registrando evento...";
+
     try {
+      // 1. Descifrar el QR
       const datos = descifrarBlobQR(blobCifrado, CONFIG.CLAVE_EMPRESA);
-      datosActuales = datos;
-      setTimeout(() => mostrarDatos(datos), 200);
-    } catch (e) {
-      setTimeout(() => {
-        alert("Error al descifrar el QR:\n\n" + e.message +
-              "\n\nVerifica que la etiqueta sea del sistema Visor Tarimas.");
-        mostrarVista("view-ready");
-      }, 200);
-    }
-  }
 
-  function fmtNumero(n) {
-    return Number(n || 0).toLocaleString("es-MX", {
-      minimumFractionDigits: 2, maximumFractionDigits: 2
-    });
-  }
+      // 2. Enviar a Apps Script
+      const session = getSession();
+      const payload = {
+        accion: "evento",
+        qr_id: datos.qr_id || (datos.o + "-" + datos.l),
+        camion: datos.c || datos.camion || "",
+        po: datos.po || "",
+        dc: datos.dc || datos.g || "",
+        sabor: datos.s || datos.sabor || "",
+        lote: datos.l || datos.lote || "",
+        num_tarima: datos.t || datos.num_tarima || 0,
+        evento: modoActual.evento,
+        usuario: session.user,
+        nombre: session.nombre,
+        rol: session.rol,
+        notas: "",
+      };
 
-  function mostrarDatos(d) {
-    document.getElementById("result-titulo").textContent = `Tarima ${d.o}`;
-    document.getElementById("result-subtitulo").textContent = `Lote: ${d.l}`;
-    document.getElementById("meta-oar").textContent = d.o;
-    document.getElementById("meta-lote").textContent = d.l;
-    document.getElementById("meta-total").textContent = d.u;
-
-    document.getElementById("val-entrada").textContent = fmtNumero(d.e);
-    document.getElementById("val-consumo").textContent = fmtNumero(d.c);
-    document.getElementById("val-saldo").textContent = fmtNumero(d.s);
-    document.getElementById("unidad-entrada").textContent = d.u;
-    document.getElementById("unidad-consumo").textContent = d.u;
-    document.getElementById("unidad-saldo").textContent = d.u;
-
-    mostrarVista("view-result");
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // ENVÍO A APPS SCRIPT
-  // ═══════════════════════════════════════════════════════════
-
-  async function enviarCorreo() {
-    if (!datosActuales) return;
-    const session = getSession();
-    const statusEl = document.getElementById("send-status");
-    const btn = document.getElementById("btn-send-email");
-
-    statusEl.textContent = "Enviando reporte...";
-    statusEl.className = "send-status";
-    btn.disabled = true;
-
-    const payload = {
-      usuario: session.user,
-      nombre: session.nombre,
-      rol: session.rol,
-      codigo_oar: datosActuales.o,
-      lote: datosActuales.l,
-      blob_cifrado: JSON.stringify(datosActuales),
-      timestamp: new Date().toISOString()
-    };
-
-    try {
-      await fetch(CONFIG.APPS_SCRIPT_URL, {
+      const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify(payload)
       });
-      statusEl.textContent = "✅ Reporte enviado a sensabit@gmail.com";
-      statusEl.className = "send-status ok";
-      btn.disabled = false;
+
+      // Con no-cors no podemos leer la respuesta
+      setTimeout(() => mostrarExito(datos, session), 500);
+
     } catch (e) {
-      statusEl.textContent = "❌ Error al enviar: " + e.message;
-      statusEl.className = "send-status error";
-      btn.disabled = false;
+      setTimeout(() => {
+        alert("Error al procesar el QR:\n\n" + e.message);
+        mostrarVista("view-ready");
+      }, 300);
     }
   }
+
+  function mostrarExito(datos, session) {
+    const ahora = new Date();
+    const fecha = ahora.toLocaleDateString("es-MX");
+    const hora = ahora.toLocaleTimeString("es-MX");
+
+    document.getElementById("result-titulo").textContent = `✅ ${modoActual.etiqueta}`;
+    document.getElementById("result-subtitulo").textContent =
+      `${datos.dc ? "DC " + datos.dc : ""} ${datos.s || ""} - ${datos.po || ""}`;
+
+    document.getElementById("meta-evento").textContent = modoActual.evento || "CONSULTA";
+    document.getElementById("meta-ubicacion").textContent = modoActual.ubicacion;
+    document.getElementById("meta-fecha").textContent = `${fecha} ${hora}`;
+
+    document.getElementById("meta-camion").textContent = datos.c || datos.camion || "-";
+    document.getElementById("meta-dc").textContent = datos.dc || datos.g || "-";
+    document.getElementById("meta-sabor").textContent = datos.s || datos.sabor || "-";
+
+    document.getElementById("meta-lote").textContent = datos.l || datos.lote || "-";
+    document.getElementById("meta-tarima").textContent = datos.t || datos.num_tarima || "-";
+    document.getElementById("meta-po").textContent = datos.po || "-";
+
+    mostrarVista("view-result");
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // API PÚBLICA
+  // ═══════════════════════════════════════════════════════════
 
   return { initLogin, initScanner };
 
