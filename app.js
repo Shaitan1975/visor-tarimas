@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v3)
+// VISOR TARIMAS - LÓGICA DE LA PWA (v4)
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -68,23 +68,20 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // DESCIFRADO AES-256-CBC (igual que Python)
+  // DESCIFRADO AES-256-CBC
   // ═══════════════════════════════════════════════════════════
 
   function descifrarBlobQR(blobB64, password) {
-    // 1. Derivar clave
     const key = CryptoJS.PBKDF2(password, CONFIG.SALT_PBKDF2, {
       keySize: 256 / 32,
       iterations: CONFIG.ITERACIONES,
       hasher: CryptoJS.algo.SHA256
     });
 
-    // 2. Base64 urlsafe → bytes
     let normalized = blobB64.replace(/-/g, "+").replace(/_/g, "/");
     while (normalized.length % 4 !== 0) normalized += "=";
     const combined = CryptoJS.enc.Base64.parse(normalized);
 
-    // 3. Separar IV (16 bytes = 32 chars hex) del ciphertext
     const combinedHex = combined.toString(CryptoJS.enc.Hex);
     const ivHex = combinedHex.substring(0, 32);
     const ciphertextHex = combinedHex.substring(32);
@@ -92,7 +89,6 @@ const App = (() => {
     const iv = CryptoJS.enc.Hex.parse(ivHex);
     const ciphertext = CryptoJS.enc.Hex.parse(ciphertextHex);
 
-    // 4. Descifrar
     const decrypted = CryptoJS.AES.decrypt(
       { ciphertext: ciphertext },
       key,
@@ -232,6 +228,8 @@ const App = (() => {
   }
 
   function procesarQR(blobCifrado) {
+    console.log("🔍 BLOB LEÍDO:", blobCifrado);
+    console.log("🔍 LONGITUD:", blobCifrado.length);
     mostrarVista("view-loading");
     try {
       const datos = descifrarBlobQR(blobCifrado, CONFIG.CLAVE_EMPRESA);
@@ -254,23 +252,17 @@ const App = (() => {
 
   function mostrarDatos(d) {
     document.getElementById("result-titulo").textContent = `Tarima ${d.o}`;
-    document.getElementById("result-subtitulo").textContent =
-      `Lote: ${d.l} | Tipo: ${d.t}`;
+    document.getElementById("result-subtitulo").textContent = `Lote: ${d.l}`;
     document.getElementById("meta-oar").textContent = d.o;
     document.getElementById("meta-lote").textContent = d.l;
     document.getElementById("meta-total").textContent = d.u;
 
-    // Rellenar las 3 tarjetas de totales
     document.getElementById("val-entrada").textContent = fmtNumero(d.e);
     document.getElementById("val-consumo").textContent = fmtNumero(d.c);
     document.getElementById("val-saldo").textContent = fmtNumero(d.s);
     document.getElementById("unidad-entrada").textContent = d.u;
     document.getElementById("unidad-consumo").textContent = d.u;
     document.getElementById("unidad-saldo").textContent = d.u;
-
-    // Extras
-    document.getElementById("extra-fecha").textContent = d.fe || "-";
-    document.getElementById("extra-proveedor").textContent = d.p || "-";
 
     mostrarVista("view-result");
   }
