@@ -1,8 +1,11 @@
 // ═══════════════════════════════════════════════════════════
-// SERVICE WORKER - Cachea los archivos para uso offline
+// SERVICE WORKER - Visor Tarimas
 // ═══════════════════════════════════════════════════════════
 
-const CACHE_NAME = 'visor-tarimas-v1';
+// 🔴 CAMBIA ESTE NÚMERO cada vez que actualices la app
+const CACHE_VERSION = 'v4';
+const CACHE_NAME = 'visor-tarimas-' + CACHE_VERSION;
+
 const ARCHIVOS_CACHE = [
   './',
   './index.html',
@@ -17,6 +20,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(ARCHIVOS_CACHE))
   );
+  // Fuerza al SW nuevo a activarse inmediatamente
   self.skipWaiting();
 });
 
@@ -26,20 +30,17 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
-  // No interceptar peticiones a Google Apps Script ni a CDNs externos
   const url = event.request.url;
+  // No interceptar llamadas a servicios externos
   if (url.includes('script.google.com') ||
-      url.includes('cdn.jsdelivr.net') ||
-      url.includes('cdnjs.cloudflare.com')) {
+      url.includes('cdn.jsdelivr.net')) {
     return;
   }
-
   event.respondWith(
     caches.match(event.request).then((resp) => resp || fetch(event.request))
   );
