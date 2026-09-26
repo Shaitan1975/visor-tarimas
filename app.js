@@ -80,57 +80,43 @@ const App = (() => {
   // ═══════════════════════════════════════════════════════════
 
   function descifrarBlobQR(blobB64, password) {
-    // 1. Derivar clave con PBKDF2 (misma config que Python)
-    const key = CryptoJS.PBKDF2(password, CONFIG.SALT_PBKDF2, {
-      keySize: 256 / 32,
-      iterations: CONFIG.ITERACIONES,
-      hasher: CryptoJS.algo.SHA256
-    });
+  // 1. Derivar clave AES-256 con PBKDF2
+  const key = CryptoJS.PBKDF2(password, CONFIG.SALT_PBKDF2, {
+    keySize: 256 / 32,
+    iterations: CONFIG.ITERACIONES,
+    hasher: CryptoJS.algo.SHA256
+  });
 
-    // 2. Decodificar base64 urlsafe
-    const normalized = blobB64.replace(/-/g, "+").replace(/_/g, "/");
-    const rawBytes = CryptoJS.enc.Base64.parse(normalized);
+  // 2. Decodificar Base64 (normalizar urlsafe y agregar padding)
+  let normalized = blobB64.replace(/-/g, "+").replace(/_/g, "/");
+  while (normalized.length % 4 !== 0) normalized += "=";
+  const combined = CryptoJS.enc.Base64.parse(normalized);
 
-    // 3. Estructura Fernet: version(1) + timestamp(8) + IV(16) + ciphertext + HMAC(32)
-    // Fernet usa la clave para AES-128 (primeros 16 bytes) y HMAC-SHA256 (últimos 16)
-    const keyBytes = CryptoJS.enc.Base64.parse(
-      key.toString(CryptoJS.enc.Base64)
-    );
-    const signingKey = CryptoJS.lib.WordArray.create(keyBytes.words.slice(0, 4));
-    const encryptionKey = CryptoJS.lib.WordArray.create(keyBytes.words.slice(4, 8));
+  // 3. Separar IV (primeros 16 bytes) del ciphertext
+  const combinedHex = combined.toString(CryptoJS.enc.Hex);
+  const ivHex = combinedHex.substring(0, 32);
+  const ciphertextHex = combinedHex.substring(32);
 
-    // 4. Extraer IV y ciphertext del blob (saltando los primeros 9 bytes)
-    const iv = CryptoJS.lib.WordArray.create(rawBytes.words.slice(2), 16);
-    // Ajuste fino de offset (9 bytes = 2 palabras + 1 byte)
-    const ivBytes = rawBytes.clone();
-    ivBytes.sigBytes = 4;
-    ivBytes.words = ivBytes.words.slice(2, 3);
-    const ivReal = CryptoJS.lib.WordArray.create(
-      rawBytes.words.slice(2, 6), 16
-    );
-    ivReal.words = rawBytes.words.slice(2, 6);
+  const iv = CryptoJS.enc.Hex.parse(ivHex);
+  const ciphertext = CryptoJS.enc.Hex.parse(ciphertextHex);
 
-    const ciphertext = CryptoJS.lib.WordArray.create(
-      rawBytes.words.slice(6, rawBytes.words.length - 8),
-      rawBytes.sigBytes - 25 - 32
-    );
+  // 4. Descifrar AES-256-CBC
+  const decrypted = CryptoJS.AES.decrypt(
+    { ciphertext: ciphertext },
+    key,
+    {
+      iv: iv,
+      mode: CryptoJS.mode.CBC,
+      padding: CryptoJS.pad.Pkcs7
+    }
+  );
 
-    // 5. Descifrar AES-128-CBC
-    const decrypted = CryptoJS.AES.decrypt(
-      { ciphertext: ciphertext },
-      encryptionKey,
-      {
-        iv: ivReal,
-        mode: CryptoJS.mode.CBC,
-        padding: CryptoJS.pad.Pkcs7
-      }
-    );
+  // 5. Convertir a UTF-8 y parsear JSON
+  const texto = decrypted.toString(CryptoJS.enc.Utf8);
+  if (!texto) throw new Error("Contraseña incorrecta o datos corruptos");
 
-    const texto = decrypted.toString(CryptoJS.enc.Utf8);
-    if (!texto) throw new Error("Contraseña incorrecta o datos corruptos");
-
-    return JSON.parse(texto);
-  }
+  return JSON.parse(texto);
+}
 
   // ═══════════════════════════════════════════════════════════
   // LOGIN
