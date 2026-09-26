@@ -30,25 +30,29 @@ const App = (() => {
   }
 
   async function pbkdf2Hash(password, salt) {
-    const enc = new TextEncoder();
-    const keyMaterial = await crypto.subtle.importKey(
-      "raw", enc.encode(password),
-      { name: "PBKDF2" }, false, ["deriveBits"]
-    );
-    const bits = await crypto.subtle.deriveBits(
-      {
-        name: "PBKDF2",
-        salt: enc.encode(salt),
-        iterations: CONFIG.ITERACIONES,
-        hash: "SHA-256"
-      },
-      keyMaterial,
-      256
-    );
-    return Array.from(new Uint8Array(bits))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", enc.encode(password),
+    { name: "PBKDF2" }, false, ["deriveBits"]
+  );
+  // 🔧 FIX: convertir salt de string hex a bytes reales (igual que Python)
+  const saltBytes = new Uint8Array(
+    salt.match(/.{1,2}/g).map(b => parseInt(b, 16))
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: saltBytes,
+      iterations: CONFIG.ITERACIONES,
+      hash: "SHA-256"
+    },
+    keyMaterial,
+    256
+  );
+  return Array.from(new Uint8Array(bits))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+}
 
   async function verificarUsuario(usuario, password) {
     try {
