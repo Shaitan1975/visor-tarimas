@@ -17,7 +17,7 @@
   </div>
   <div class="header-right">
     <span id="user-info" class="user-info"></span>
-    <button id="btn-logout" class="btn-logout" title="Cerrar sesión">Salir</button>
+    <button id="btn-logout" class="btn-logout">Salir</button>
   </div>
 </header>
 
@@ -66,23 +66,39 @@
         <span class="meta-value" id="meta-lote">-</span>
       </div>
       <div class="meta-item">
-        <span class="meta-label">Total movimientos</span>
+        <span class="meta-label">Unidad</span>
         <span class="meta-value" id="meta-total">-</span>
       </div>
     </div>
 
-    <div class="result-table-wrapper">
-      <table class="result-table">
-        <thead>
-          <tr>
-            <th>Fecha</th>
-            <th>Movimiento</th>
-            <th>Cantidad</th>
-            <th>Ubicación</th>
-          </tr>
-        </thead>
-        <tbody id="tabla-movimientos"></tbody>
-      </table>
+    <!-- Totales: ENTRADA / CONSUMO / SALDO -->
+    <div class="totales-grid">
+      <div class="total-card entrada">
+        <div class="total-label">ENTRADA</div>
+        <div class="total-valor" id="val-entrada">0.00</div>
+        <div class="total-unidad" id="unidad-entrada">-</div>
+      </div>
+      <div class="total-card consumo">
+        <div class="total-label">CONSUMO</div>
+        <div class="total-valor" id="val-consumo">0.00</div>
+        <div class="total-unidad" id="unidad-consumo">-</div>
+      </div>
+      <div class="total-card saldo">
+        <div class="total-label">SALDO</div>
+        <div class="total-valor" id="val-saldo">0.00</div>
+        <div class="total-unidad" id="unidad-saldo">-</div>
+      </div>
+    </div>
+
+    <div class="extras">
+      <div class="extra-item">
+        <span class="extra-label">Fecha entrada:</span>
+        <span id="extra-fecha">-</span>
+      </div>
+      <div class="extra-item">
+        <span class="extra-label">Proveedor:</span>
+        <span id="extra-proveedor">-</span>
+      </div>
     </div>
 
     <div class="result-actions">
