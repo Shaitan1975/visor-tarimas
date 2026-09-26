@@ -8,9 +8,9 @@
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="styles.css">
 </head>
-<body class="scanner-body">
+<body class="scanner-body" id="scanner-body">
 
-<header class="app-header">
+<header class="app-header" id="app-header">
   <div class="header-left">
     <span class="header-logo">📦</span>
     <span class="header-title">Visor Tarimas</span>
@@ -21,13 +21,18 @@
   </div>
 </header>
 
+<div id="modo-indicador" class="modo-indicador">
+  <span id="modo-icono">📍</span>
+  <span id="modo-texto">CARGANDO MODO...</span>
+</div>
+
 <main class="scanner-main">
 
   <section id="view-ready" class="view-section">
     <div class="ready-container">
       <div class="ready-icon">📷</div>
-      <h2>Listo para escanear</h2>
-      <p>Toca el botón para activar la cámara y escanear el código QR de la etiqueta.</p>
+      <h2 id="ready-titulo">Listo para escanear</h2>
+      <p id="ready-descripcion">Toca el botón para activar la cámara y escanear el código QR de la etiqueta.</p>
       <button id="btn-start-scan" class="btn-primary btn-large">🎥 Escanear QR</button>
     </div>
   </section>
@@ -46,56 +51,64 @@
   <section id="view-loading" class="view-section hidden">
     <div class="loading-container">
       <div class="spinner"></div>
-      <p>Descifrando información...</p>
+      <p id="loading-text">Registrando evento...</p>
     </div>
   </section>
 
   <section id="view-result" class="view-section hidden">
     <div class="result-header">
-      <h2 id="result-titulo">Tarima</h2>
+      <h2 id="result-titulo">✅ Evento registrado</h2>
       <p id="result-subtitulo"></p>
     </div>
 
     <div class="result-meta">
       <div class="meta-item">
-        <span class="meta-label">Código OAR</span>
-        <span class="meta-value" id="meta-oar">-</span>
+        <span class="meta-label">Evento</span>
+        <span class="meta-value" id="meta-evento">-</span>
       </div>
+      <div class="meta-item">
+        <span class="meta-label">Ubicación</span>
+        <span class="meta-value" id="meta-ubicacion">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Fecha/Hora</span>
+        <span class="meta-value" id="meta-fecha">-</span>
+      </div>
+    </div>
+
+    <div class="result-meta">
+      <div class="meta-item">
+        <span class="meta-label">Camión</span>
+        <span class="meta-value" id="meta-camion">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">DC</span>
+        <span class="meta-value" id="meta-dc">-</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Sabor</span>
+        <span class="meta-value" id="meta-sabor">-</span>
+      </div>
+    </div>
+
+    <div class="result-meta">
       <div class="meta-item">
         <span class="meta-label">Lote</span>
         <span class="meta-value" id="meta-lote">-</span>
       </div>
       <div class="meta-item">
-        <span class="meta-label">Unidad</span>
-        <span class="meta-value" id="meta-total">-</span>
+        <span class="meta-label"># Tarima</span>
+        <span class="meta-value" id="meta-tarima">-</span>
       </div>
-    </div>
-
-    <!-- Totales: ENTRADA / CONSUMO / SALDO -->
-    <div class="totales-grid">
-      <div class="total-card entrada">
-        <div class="total-label">ENTRADA</div>
-        <div class="total-valor" id="val-entrada">0.00</div>
-        <div class="total-unidad" id="unidad-entrada">-</div>
-      </div>
-      <div class="total-card consumo">
-        <div class="total-label">CONSUMO</div>
-        <div class="total-valor" id="val-consumo">0.00</div>
-        <div class="total-unidad" id="unidad-consumo">-</div>
-      </div>
-      <div class="total-card saldo">
-        <div class="total-label">SALDO</div>
-        <div class="total-valor" id="val-saldo">0.00</div>
-        <div class="total-unidad" id="unidad-saldo">-</div>
+      <div class="meta-item">
+        <span class="meta-label">PO</span>
+        <span class="meta-value" id="meta-po">-</span>
       </div>
     </div>
 
     <div class="result-actions">
-      <button id="btn-send-email" class="btn-primary btn-large">
-        📧 Enviar reporte a gerencia
-      </button>
-      <button id="btn-scan-again" class="btn-secondary">
-        🔄 Escanear otro QR
+      <button id="btn-scan-again" class="btn-primary btn-large">
+        🔄 Escanear otra tarima
       </button>
     </div>
 
