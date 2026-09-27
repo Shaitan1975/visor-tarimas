@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v8)
-// Detecta automáticamente QR de PT (texto plano) o INSUMOS (cifrado)
+// VISOR TARIMAS - LÓGICA DE LA PWA (v9)
+// Detecta el rol del usuario y muestra los eventos permitidos
 // Empresa: Mediese
 // ═══════════════════════════════════════════════════════════════════
 
@@ -12,85 +12,51 @@ const CONFIG = {
   SESSION_KEY: "visor_tarimas_session"
 };
 
-// Mapeo de lugares a eventos
-const MAPA_LUGARES = {
-  "planta": {
-    evento: "SALIDA_PLANTA",
-    ubicacion: "PLANTA",
+// Catálogo de eventos posibles
+const EVENTOS = {
+  "SALIDA_PLANTA": {
     etiqueta: "🚚 SALIDA DE PLANTA",
+    ubicacion: "PLANTA",
     color: "#1F4E79",
-    colorFondo: "#D9E5F2",
     icono: "🚚",
   },
-  "aduana-entrada": {
-    evento: "ADUANA_ENTRADA",
-    ubicacion: "ADUANA",
+  "ADUANA_ENTRADA": {
     etiqueta: "🛃 ENTRADA A ADUANA",
+    ubicacion: "ADUANA",
     color: "#B8860B",
-    colorFondo: "#FFF8DC",
     icono: "🛃",
   },
-  "aduana-salida": {
-    evento: "ADUANA_SALIDA",
-    ubicacion: "EN_TRANSITO",
+  "ADUANA_SALIDA": {
     etiqueta: "📦 SALIDA DE ADUANA",
+    ubicacion: "EN_TRANSITO",
     color: "#8B4513",
-    colorFondo: "#F5DEB3",
     icono: "📦",
   },
-  "cedis": {
-    evento: "ENTREGA_CEDIS",
-    ubicacion: "CEDIS",
+  "ENTREGA_CEDIS": {
     etiqueta: "✅ ENTREGA EN CEDIS",
+    ubicacion: "CEDIS",
     color: "#1F7A1F",
-    colorFondo: "#D9F0D9",
     icono: "✅",
   },
-  "insumos": {
-    evento: null,
-    ubicacion: "ALMACEN",
-    etiqueta: "📋 CONSULTA DE INSUMOS",
-    color: "#666666",
-    colorFondo: "#F5F5F5",
-    icono: "📋",
-  },
+};
+
+// Modos por URL (compatibilidad)
+const MAPA_LUGARES = {
+  "planta": "SALIDA_PLANTA",
+  "aduana-entrada": "ADUANA_ENTRADA",
+  "aduana-salida": "ADUANA_SALIDA",
+  "cedis": "ENTREGA_CEDIS",
 };
 
 const App = (() => {
 
   // ═══════════════════════════════════════════════════════════
-  // CONFIGURACIÓN DE MODO (según URL)
+  // ESTADO
   // ═══════════════════════════════════════════════════════════
 
-  function obtenerModo() {
-    const params = new URLSearchParams(window.location.search);
-    const lugar = params.get("lugar") || "insumos";
-    return MAPA_LUGARES[lugar] || MAPA_LUGARES["insumos"];
-  }
-
-  function aplicarModoVisual(modo) {
-    const indicador = document.getElementById("modo-indicador");
-    const texto = document.getElementById("modo-texto");
-    const icono = document.getElementById("modo-icono");
-
-    if (indicador && texto && icono) {
-      texto.textContent = modo.etiqueta;
-      icono.textContent = modo.icono;
-      indicador.style.background = modo.color;
-      indicador.style.color = "#FFFFFF";
-    }
-
-    const readyTitulo = document.getElementById("ready-titulo");
-    const readyDesc = document.getElementById("ready-descripcion");
-
-    if (modo.evento === null) {
-      if (readyTitulo) readyTitulo.textContent = "Listo para escanear";
-      if (readyDesc) readyDesc.textContent = "Consulta la información de la tarima.";
-    } else {
-      if (readyTitulo) readyTitulo.textContent = modo.etiqueta;
-      if (readyDesc) readyDesc.textContent = "Escanea cada tarima para registrar el evento.";
-    }
-  }
+  let modoActual = null;
+  let modoSeleccionado = null;  // Evento elegido en el selector
+  let datosActuales = null;
 
   // ═══════════════════════════════════════════════════════════
   // SESIÓN
@@ -138,7 +104,13 @@ const App = (() => {
       if (!user) return null;
       const hashCalc = await pbkdf2Hash(password, user.salt);
       if (hashCalc === user.hash) {
-        return { user: user.user, nombre: user.nombre, rol: user.rol };
+        return {
+          user: user.user,
+          nombre: user.nombre,
+          rol: user.rol,
+          ubicacion: user.ubicacion || "planta",
+          eventos_permitidos: user.eventos_permitidos || ["SALIDA_PLANTA"],
+        };
       }
       return null;
     } catch (e) {
@@ -148,7 +120,7 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // DESCIFRADO (para insumos)
+  // DESCIFRADO
   // ═══════════════════════════════════════════════════════════
 
   function descifrarBlobQR(blobB64, password) {
@@ -180,12 +152,7 @@ const App = (() => {
     return JSON.parse(texto);
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // PARSEO DE QR DE PT (texto plano)
-  // ═══════════════════════════════════════════════════════════
-
   function parsearQRPT(texto) {
-    // Ej: "PO:14641379|CEDIS:99003|DC:003|S:OR|CAM:C22|TARIMA:3|TOT:28|LOTES:LMKSH-4:5200"
     const partes = {};
     texto.split("|").forEach(p => {
       const idx = p.indexOf(":");
@@ -212,8 +179,7 @@ const App = (() => {
     const tarima = partes.TARIMA || "";
 
     return {
-      o: dc,
-      l: tarima,
+      o: dc, l: tarima,
       po: partes.PO || "",
       cedis: partes.CEDIS || "",
       dc: dc,
@@ -234,8 +200,7 @@ const App = (() => {
 
   function initLogin() {
     if (getSession()) {
-      const params = window.location.search;
-      window.location.href = "scanner.html" + params;
+      window.location.href = "scanner.html";
       return;
     }
     const form = document.getElementById("login-form");
@@ -252,8 +217,7 @@ const App = (() => {
       const user = await verificarUsuario(usuario, password);
       if (user) {
         setSession(user);
-        const params = window.location.search;
-        window.location.href = "scanner.html" + params;
+        window.location.href = "scanner.html";
       } else {
         errorMsg.textContent = "Usuario o contraseña incorrectos";
         btn.disabled = false;
@@ -268,18 +232,13 @@ const App = (() => {
 
   let stream = null;
   let scanning = false;
-  let modoActual = null;
 
   function initScanner() {
     const session = getSession();
     if (!session) {
-      const params = window.location.search;
-      window.location.href = "index.html" + params;
+      window.location.href = "index.html";
       return;
     }
-
-    modoActual = obtenerModo();
-    aplicarModoVisual(modoActual);
 
     document.getElementById("user-info").textContent =
       `${session.nombre} (${session.rol})`;
@@ -289,6 +248,16 @@ const App = (() => {
       window.location.href = "index.html";
     });
 
+    // Botones del selector
+    const btnCambiar = document.getElementById("btn-cambiar-evento");
+    if (btnCambiar) {
+      btnCambiar.addEventListener("click", () => {
+        modoSeleccionado = null;
+        iniciarFlujo(session);
+      });
+    }
+
+    // Botones del escaneo
     document.getElementById("btn-start-scan").addEventListener("click", iniciarCamara);
     document.getElementById("btn-cancel-scan").addEventListener("click", cancelarCamara);
     document.getElementById("btn-scan-again").addEventListener("click", () => {
@@ -301,12 +270,113 @@ const App = (() => {
         reg.update().catch(() => {});
       }).catch(() => {});
     }
+
+    iniciarFlujo(session);
+  }
+
+  function iniciarFlujo(session) {
+    // 1. Prioridad: URL ?lugar=
+    const params = new URLSearchParams(window.location.search);
+    const lugarParam = params.get("lugar");
+    if (lugarParam && MAPA_LUGARES[lugarParam]) {
+      modoSeleccionado = MAPA_LUGARES[lugarParam];
+      aplicarModo(EVENTOS[modoSeleccionado]);
+      mostrarVista("view-ready");
+      return;
+    }
+
+    // 2. Eventos permitidos del usuario
+    const eventos = session.eventos_permitidos || ["SALIDA_PLANTA"];
+
+    if (eventos.length === 0) {
+      alert("Tu usuario no tiene eventos asignados. Contacta al administrador.");
+      clearSession();
+      window.location.href = "index.html";
+      return;
+    }
+
+    if (eventos.length === 1) {
+      // Solo 1 evento: ir directo
+      modoSeleccionado = eventos[0];
+      aplicarModo(EVENTOS[modoSeleccionado]);
+      mostrarVista("view-ready");
+      return;
+    }
+
+    // Varios eventos: mostrar selector
+    mostrarSelector(eventos);
+  }
+
+  function mostrarSelector(eventos) {
+    // Ocultar todas las vistas
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector"]
+      .forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.classList.add("hidden");
+      });
+
+    // Ocultar banner
+    const banner = document.getElementById("modo-indicador");
+    if (banner) banner.style.display = "none";
+
+    const contenedor = document.getElementById("lista-eventos");
+    contenedor.innerHTML = "";
+
+    eventos.forEach(ev => {
+      const info = EVENTOS[ev];
+      if (!info) return;
+
+      const btn = document.createElement("button");
+      btn.className = "btn-evento";
+      btn.style.background = info.color;
+      btn.innerHTML = `${info.icono}<br/><span>${info.etiqueta}</span>`;
+      btn.addEventListener("click", () => {
+        modoSeleccionado = ev;
+        aplicarModo(info);
+        mostrarVista("view-ready");
+      });
+      contenedor.appendChild(btn);
+    });
+
+    document.getElementById("view-selector").classList.remove("hidden");
+  }
+
+  function aplicarModo(info) {
+    // Banner
+    const banner = document.getElementById("modo-indicador");
+    const texto = document.getElementById("modo-texto");
+    const icono = document.getElementById("modo-icono");
+
+    if (banner) banner.style.display = "flex";
+    if (texto) texto.textContent = info.etiqueta;
+    if (icono) icono.textContent = info.icono;
+    if (banner) banner.style.background = info.color;
+
+    // Botón "Cambiar evento"
+    const btnCambiar = document.getElementById("btn-cambiar-evento");
+    if (btnCambiar) {
+      // Solo mostrar si el usuario tiene más de 1 evento
+      const session = getSession();
+      if (session && session.eventos_permitidos && session.eventos_permitidos.length > 1) {
+        btnCambiar.classList.remove("hidden");
+      } else {
+        btnCambiar.classList.add("hidden");
+      }
+    }
+
+    // Textos
+    const readyTitulo = document.getElementById("ready-titulo");
+    const readyDesc = document.getElementById("ready-descripcion");
+    if (readyTitulo) readyTitulo.textContent = info.etiqueta;
+    if (readyDesc) readyDesc.textContent = "Escanea cada tarima para registrar el evento.";
   }
 
   function mostrarVista(id) {
-    ["view-ready", "view-scanning", "view-loading", "view-result"].forEach(v => {
-      document.getElementById(v).classList.add("hidden");
-    });
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector"]
+      .forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.classList.add("hidden");
+      });
     document.getElementById(id).classList.remove("hidden");
   }
 
@@ -368,18 +438,15 @@ const App = (() => {
     try {
       let datos = null;
 
-      // Detectar tipo de QR
       if (datosQR.includes("PO:") && datosQR.includes("|")) {
-        // QR de PT (texto plano)
-        console.log("QR de PT detectado");
         datos = parsearQRPT(datosQR);
       } else {
-        // QR de INSUMOS (cifrado)
-        console.log("QR de INSUMOS detectado");
         datos = descifrarBlobQR(datosQR, CONFIG.CLAVE_EMPRESA);
       }
 
+      datosActuales = datos;
       const session = getSession();
+
       const payload = {
         accion: "evento",
         qr_id: datos.qr_id || (datos.camion || "") + "-DC" + (datos.dc || "") + "-" + (datos.s || "") + "-T" + (datos.num_tarima || ""),
@@ -390,20 +457,19 @@ const App = (() => {
         sabor: datos.s || datos.sabor || "",
         lote: datos.lote || (datos.lotes && datos.lotes[0] ? datos.lotes[0].lote : ""),
         num_tarima: datos.num_tarima || datos.t || 0,
-        evento: modoActual.evento,
+        evento: modoSeleccionado,
         usuario: session.user,
         nombre: session.nombre,
         rol: session.rol,
         notas: "",
       };
 
-      // Si hay lotes (PT), agregar
       if (datos.lotes && datos.lotes.length > 0) {
         payload.lotes = datos.lotes;
         payload.lotes_json = JSON.stringify(datos.lotes);
       }
 
-      const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
+      await fetch(CONFIG.APPS_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -424,13 +490,14 @@ const App = (() => {
     const ahora = new Date();
     const fecha = ahora.toLocaleDateString("es-MX");
     const hora = ahora.toLocaleTimeString("es-MX");
+    const info = EVENTOS[modoSeleccionado];
 
-    document.getElementById("result-titulo").textContent = "OK: " + modoActual.etiqueta;
+    document.getElementById("result-titulo").textContent = "OK: " + info.etiqueta;
     document.getElementById("result-subtitulo").textContent =
       (datos.dc ? "DC " + datos.dc : "") + " " + (datos.s || "");
 
-    document.getElementById("meta-evento").textContent = modoActual.evento || "CONSULTA";
-    document.getElementById("meta-ubicacion").textContent = modoActual.ubicacion;
+    document.getElementById("meta-evento").textContent = modoSeleccionado;
+    document.getElementById("meta-ubicacion").textContent = info.ubicacion;
     document.getElementById("meta-fecha").textContent = fecha + " " + hora;
 
     document.getElementById("meta-camion").textContent = datos.c || datos.camion || "-";
@@ -447,10 +514,6 @@ const App = (() => {
 
     mostrarVista("view-result");
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // API PÚBLICA
-  // ═══════════════════════════════════════════════════════════
 
   return { initLogin, initScanner };
 
