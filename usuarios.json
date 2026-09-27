@@ -2,15 +2,37 @@
   {
     "user": "ernesto.escobar",
     "nombre": "Ernesto Escobar",
-    "rol": "gerente",
-    "salt": "700e7c84fdab8956e116c74c1859e839",
-    "hash": "748a9a17bd6b90139b0e6766cb010aa453d283cfbada5d59a4364c7863451fef"
+    "rol": "supervisor",
+    "ubicacion": "planta",
+    "eventos_permitidos": [
+      "SALIDA_PLANTA"
+    ],
+    "salt": "054fcdcca57c9072f0092ad72f52f480",
+    "hash": "542f0ce1699183ed6644557026bfc9c60a13eaa7ba3fbd37a5846e7c8ad844a9"
   },
   {
     "user": "agustin.canseco",
     "nombre": "Agustin Canseco",
     "rol": "supervisor",
-    "salt": "eb8963568af38cb3d4c6c3aa91a095af",
-    "hash": "5b7a22d20f90ef4f98cd119e8421d4323bd01846f55ddd39559217636ecaa1ff"
+    "ubicacion": "planta",
+    "eventos_permitidos": [
+      "SALIDA_PLANTA"
+    ],
+    "salt": "ff266e4acee893dcac38122cafcae940",
+    "hash": "cab24453932e799763c3e3fddb0ff8b206f66038c9908675aae679a1844d783d"
+  },
+  {
+    "user": "sensabit",
+    "nombre": "Admin Mediese",
+    "rol": "admin",
+    "ubicacion": "admin",
+    "eventos_permitidos": [
+      "SALIDA_PLANTA",
+      "ADUANA_ENTRADA",
+      "ADUANA_SALIDA",
+      "ENTREGA_CEDIS"
+    ],
+    "salt": "8a9371bdde316f0827567bf25bd7e1a0",
+    "hash": "c0d7ec9aaeecd3351f9af7ae0dd2759d872a3073b65e431d8680010b707e008b"
   }
 ]
