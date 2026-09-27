@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════
 
 // 🔴 CAMBIA ESTE NÚMERO cada vez que actualices la app
-const CACHE_VERSION = 'v11';
+const CACHE_VERSION = 'v13';
 const CACHE_NAME = 'visor-tarimas-' + CACHE_VERSION;
 
 const ARCHIVOS_CACHE = [
