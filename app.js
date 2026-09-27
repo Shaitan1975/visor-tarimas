@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v5)
-// Detecta el evento según la URL (?lugar=planta, ?lugar=aduana-entrada, etc.)
+// VISOR TARIMAS - LÓGICA DE LA PWA (v8)
+// Detecta automáticamente QR de PT (texto plano) o INSUMOS (cifrado)
 // Empresa: Mediese
 // ═══════════════════════════════════════════════════════════════════
 
@@ -47,7 +47,6 @@ const MAPA_LUGARES = {
     icono: "✅",
   },
   "insumos": {
-    // Modo antiguo: solo muestra info sin registrar evento
     evento: null,
     ubicacion: "ALMACEN",
     etiqueta: "📋 CONSULTA DE INSUMOS",
@@ -70,7 +69,6 @@ const App = (() => {
   }
 
   function aplicarModoVisual(modo) {
-    // Actualizar indicador
     const indicador = document.getElementById("modo-indicador");
     const texto = document.getElementById("modo-texto");
     const icono = document.getElementById("modo-icono");
@@ -82,18 +80,15 @@ const App = (() => {
       indicador.style.color = "#FFFFFF";
     }
 
-    // Actualizar textos según modo
     const readyTitulo = document.getElementById("ready-titulo");
     const readyDesc = document.getElementById("ready-descripcion");
 
     if (modo.evento === null) {
-      // Modo insumos: solo consulta
       if (readyTitulo) readyTitulo.textContent = "Listo para escanear";
       if (readyDesc) readyDesc.textContent = "Consulta la información de la tarima.";
     } else {
-      // Modo evento: registra
       if (readyTitulo) readyTitulo.textContent = modo.etiqueta;
-      if (readyDesc) readyDesc.textContent = `Escanea cada tarima para registrar ${modo.etiqueta.replace(/^[^\s]+\s/, '')}`;
+      if (readyDesc) readyDesc.textContent = "Escanea cada tarima para registrar el evento.";
     }
   }
 
@@ -153,7 +148,7 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // DESCIFRADO
+  // DESCIFRADO (para insumos)
   // ═══════════════════════════════════════════════════════════
 
   function descifrarBlobQR(blobB64, password) {
@@ -186,12 +181,59 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // PARSEO DE QR DE PT (texto plano)
+  // ═══════════════════════════════════════════════════════════
+
+  function parsearQRPT(texto) {
+    // Ej: "PO:14641379|CEDIS:99003|DC:003|S:OR|CAM:C22|TARIMA:3|TOT:28|LOTES:LMKSH-4:5200"
+    const partes = {};
+    texto.split("|").forEach(p => {
+      const idx = p.indexOf(":");
+      if (idx > 0) {
+        const k = p.substring(0, idx).trim();
+        const v = p.substring(idx + 1).trim();
+        partes[k] = v;
+      }
+    });
+
+    let lotes = [];
+    if (partes.LOTES) {
+      partes.LOTES.split(",").forEach(l => {
+        const idx = l.indexOf(":");
+        if (idx > 0) {
+          const lote = l.substring(0, idx).trim();
+          const pz = parseInt(l.substring(idx + 1).trim()) || 0;
+          lotes.push({ lote: lote, pz: pz });
+        }
+      });
+    }
+
+    const dc = partes.DC || "";
+    const tarima = partes.TARIMA || "";
+
+    return {
+      o: dc,
+      l: tarima,
+      po: partes.PO || "",
+      cedis: partes.CEDIS || "",
+      dc: dc,
+      s: partes.S || "",
+      c: partes.CAM || "",
+      camion: partes.CAM || "",
+      num_tarima: tarima,
+      t: tarima,
+      tot: partes.TOT || "",
+      lotes: lotes,
+      es_pt: true,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // LOGIN
   // ═══════════════════════════════════════════════════════════
 
   function initLogin() {
     if (getSession()) {
-      // Preservar el parámetro ?lugar= al redirigir
       const params = window.location.search;
       window.location.href = "scanner.html" + params;
       return;
@@ -319,31 +361,47 @@ const App = (() => {
     requestAnimationFrame(tick);
   }
 
-  async function procesarQR(blobCifrado) {
+  async function procesarQR(datosQR) {
     mostrarVista("view-loading");
     document.getElementById("loading-text").textContent = "Registrando evento...";
 
     try {
-      // 1. Descifrar el QR
-      const datos = descifrarBlobQR(blobCifrado, CONFIG.CLAVE_EMPRESA);
+      let datos = null;
 
-      // 2. Enviar a Apps Script
+      // Detectar tipo de QR
+      if (datosQR.includes("PO:") && datosQR.includes("|")) {
+        // QR de PT (texto plano)
+        console.log("QR de PT detectado");
+        datos = parsearQRPT(datosQR);
+      } else {
+        // QR de INSUMOS (cifrado)
+        console.log("QR de INSUMOS detectado");
+        datos = descifrarBlobQR(datosQR, CONFIG.CLAVE_EMPRESA);
+      }
+
       const session = getSession();
       const payload = {
         accion: "evento",
-        qr_id: datos.qr_id || (datos.o + "-" + datos.l),
+        qr_id: datos.qr_id || (datos.camion || "") + "-DC" + (datos.dc || "") + "-" + (datos.s || "") + "-T" + (datos.num_tarima || ""),
         camion: datos.c || datos.camion || "",
         po: datos.po || "",
-        dc: datos.dc || datos.g || "",
+        cedis: datos.cedis || "",
+        dc: datos.dc || datos.g || datos.o || "",
         sabor: datos.s || datos.sabor || "",
-        lote: datos.l || datos.lote || "",
-        num_tarima: datos.t || datos.num_tarima || 0,
+        lote: datos.lote || (datos.lotes && datos.lotes[0] ? datos.lotes[0].lote : ""),
+        num_tarima: datos.num_tarima || datos.t || 0,
         evento: modoActual.evento,
         usuario: session.user,
         nombre: session.nombre,
         rol: session.rol,
         notas: "",
       };
+
+      // Si hay lotes (PT), agregar
+      if (datos.lotes && datos.lotes.length > 0) {
+        payload.lotes = datos.lotes;
+        payload.lotes_json = JSON.stringify(datos.lotes);
+      }
 
       const resp = await fetch(CONFIG.APPS_SCRIPT_URL, {
         method: "POST",
@@ -352,7 +410,6 @@ const App = (() => {
         body: JSON.stringify(payload)
       });
 
-      // Con no-cors no podemos leer la respuesta
       setTimeout(() => mostrarExito(datos, session), 500);
 
     } catch (e) {
@@ -368,20 +425,24 @@ const App = (() => {
     const fecha = ahora.toLocaleDateString("es-MX");
     const hora = ahora.toLocaleTimeString("es-MX");
 
-    document.getElementById("result-titulo").textContent = `✅ ${modoActual.etiqueta}`;
+    document.getElementById("result-titulo").textContent = "OK: " + modoActual.etiqueta;
     document.getElementById("result-subtitulo").textContent =
-      `${datos.dc ? "DC " + datos.dc : ""} ${datos.s || ""} - ${datos.po || ""}`;
+      (datos.dc ? "DC " + datos.dc : "") + " " + (datos.s || "");
 
     document.getElementById("meta-evento").textContent = modoActual.evento || "CONSULTA";
     document.getElementById("meta-ubicacion").textContent = modoActual.ubicacion;
-    document.getElementById("meta-fecha").textContent = `${fecha} ${hora}`;
+    document.getElementById("meta-fecha").textContent = fecha + " " + hora;
 
     document.getElementById("meta-camion").textContent = datos.c || datos.camion || "-";
-    document.getElementById("meta-dc").textContent = datos.dc || datos.g || "-";
-    document.getElementById("meta-sabor").textContent = datos.s || datos.sabor || "-";
+    document.getElementById("meta-dc").textContent = datos.dc || "-";
+    document.getElementById("meta-sabor").textContent = datos.s || "-";
 
-    document.getElementById("meta-lote").textContent = datos.l || datos.lote || "-";
-    document.getElementById("meta-tarima").textContent = datos.t || datos.num_tarima || "-";
+    document.getElementById("meta-lote").textContent =
+      (datos.lotes && datos.lotes.length > 0)
+        ? datos.lotes.map(l => l.lote + " (" + l.pz + " PZ)").join(", ")
+        : (datos.lote || datos.l || "-");
+
+    document.getElementById("meta-tarima").textContent = datos.num_tarima || datos.t || "-";
     document.getElementById("meta-po").textContent = datos.po || "-";
 
     mostrarVista("view-result");
