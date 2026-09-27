@@ -1,7 +1,7 @@
 {
-  "name": "Visor Tarimas - ArtRub",
+  "name": "Visor Tarimas - Mediese",
   "short_name": "Visor Tarimas",
-  "description": "Sistema de consulta de movimientos de tarimas por código QR",
+  "description": "Sistema de consulta de movimientos de tarimas - Mediese",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
