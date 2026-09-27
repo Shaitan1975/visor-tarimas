@@ -28,15 +28,27 @@
 
 <main class="scanner-main">
 
-  <section id="view-ready" class="view-section">
-    <div class="ready-container">
-      <div class="ready-icon">📷</div>
-      <h2 id="ready-titulo">Listo para escanear</h2>
-      <p id="ready-descripcion">Toca el botón para activar la cámara y escanear el código QR de la etiqueta.</p>
-      <button id="btn-start-scan" class="btn-primary btn-large">🎥 Escanear QR</button>
+  <!-- Vista: SELECTOR DE EVENTO -->
+  <section id="view-selector" class="view-section hidden">
+    <div class="selector-container">
+      <h2>¿Qué deseas registrar?</h2>
+      <p class="selector-descripcion">Selecciona el tipo de evento</p>
+      <div id="lista-eventos" class="lista-eventos"></div>
     </div>
   </section>
 
+  <!-- Vista: LISTO PARA ESCANEAR -->
+  <section id="view-ready" class="view-section hidden">
+    <div class="ready-container">
+      <div class="ready-icon">📷</div>
+      <h2 id="ready-titulo">Listo para escanear</h2>
+      <p id="ready-descripcion">Toca el botón para activar la cámara.</p>
+      <button id="btn-start-scan" class="btn-primary btn-large">🎥 Escanear QR</button>
+      <button id="btn-cambiar-evento" class="btn-secondary hidden">🔄 Cambiar evento</button>
+    </div>
+  </section>
+
+  <!-- Vista: ESCANEANDO -->
   <section id="view-scanning" class="view-section hidden">
     <div class="scanner-viewport">
       <video id="qr-video" playsinline></video>
@@ -48,6 +60,7 @@
     <button id="btn-cancel-scan" class="btn-secondary">Cancelar</button>
   </section>
 
+  <!-- Vista: LOADING -->
   <section id="view-loading" class="view-section hidden">
     <div class="loading-container">
       <div class="spinner"></div>
@@ -55,9 +68,10 @@
     </div>
   </section>
 
+  <!-- Vista: RESULTADO -->
   <section id="view-result" class="view-section hidden">
     <div class="result-header">
-      <h2 id="result-titulo">✅ Evento registrado</h2>
+      <h2 id="result-titulo">OK: Evento registrado</h2>
       <p id="result-subtitulo"></p>
     </div>
 
