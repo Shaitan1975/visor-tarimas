@@ -466,7 +466,6 @@ const App = (() => {
 
       if (datos.lotes && datos.lotes.length > 0) {
         payload.lotes = datos.lotes;
-        payload.lotes_json = JSON.stringify(datos.lotes);
       }
 
       await fetch(CONFIG.APPS_SCRIPT_URL, {
