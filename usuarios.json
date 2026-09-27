@@ -2,7 +2,7 @@
   {
     "user": "ernesto.escobar",
     "nombre": "Ernesto Escobar",
-    "rol": "supervisor",
+    "rol": "gerente",
     "ubicacion": "planta",
     "eventos_permitidos": [
       "SALIDA_PLANTA"
