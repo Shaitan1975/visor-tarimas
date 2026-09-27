@@ -468,11 +468,14 @@ const App = (() => {
         payload.lotes = datos.lotes;
       }
 
+      const formData = new URLSearchParams();
+      formData.append("data", JSON.stringify(payload));
+
       await fetch(CONFIG.APPS_SCRIPT_URL, {
         method: "POST",
         mode: "no-cors",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(payload)
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: formData.toString()
       });
 
       setTimeout(() => mostrarExito(datos, session), 500);
