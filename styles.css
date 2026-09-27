@@ -290,3 +290,63 @@ html, body {
 }
 .send-status.ok { color: var(--verde-ok); }
 .send-status.error { color: var(--rojo-error); }
+
+/* ═══════════════════════════════════════════════════════════
+   SELECTOR DE EVENTOS (v9)
+   ═══════════════════════════════════════════════════════════ */
+
+.selector-container {
+  background: white;
+  border-radius: var(--radio);
+  padding: 30px 20px;
+  text-align: center;
+  box-shadow: var(--sombra);
+  margin: 20px auto;
+  max-width: 500px;
+}
+
+.selector-container h2 {
+  color: var(--azul-primario);
+  margin-bottom: 6px;
+  font-size: 20px;
+}
+
+.selector-descripcion {
+  color: var(--gris-texto);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.lista-eventos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-evento {
+  color: white;
+  border: none;
+  padding: 20px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.btn-evento:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+}
+
+.btn-evento:active {
+  transform: scale(0.98);
+}
+
+.btn-evento span {
+  display: block;
+  margin-top: 6px;
+}
