@@ -6,7 +6,7 @@
 
 // Cambia esta versión cuando hagas cambios MAYORES
 // Los usuarios se actualizarán automáticamente
-const CACHE_VERSION = 'visor-v1';
+const CACHE_VERSION = 'visor-v2';
 const CACHE_NAME = CACHE_VERSION;
 
 const ARCHIVOS_CACHE = [
