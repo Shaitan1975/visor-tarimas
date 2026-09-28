@@ -34,5 +34,16 @@
     ],
     "salt": "8a9371bdde316f0827567bf25bd7e1a0",
     "hash": "c0d7ec9aaeecd3351f9af7ae0dd2759d872a3073b65e431d8680010b707e008b"
+  },
+  {
+    "user": "olivia.barrios",
+    "nombre": "Olivia Barrios",
+    "rol": "gerente",
+    "ubicacion": "planta",
+    "eventos_permitidos": [
+      "SALIDA_PLANTA"
+    ],
+    "salt": "ca96f845cdf7b7f6f4d9bcd20c1422a7",
+    "hash": "9a66c854816a710d4f56000859d8abbf00a0ec5c659d3495675cbfeac418d38f"
   }
 ]
