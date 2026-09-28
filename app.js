@@ -267,8 +267,18 @@ const App = (() => {
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").then(reg => {
+        // Forzar chequeo de actualización cada vez que abre la app
         reg.update().catch(() => {});
       }).catch(() => {});
+
+      // Recargar automáticamente cuando haya una versión nueva activa
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
     }
 
     iniciarFlujo(session);
