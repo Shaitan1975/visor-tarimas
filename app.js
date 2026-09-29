@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v12)
-// Con pantalla de estatus de camiones + devoluciones
+// VISOR TARIMAS - LÓGICA DE LA PWA (v14)
+// Con estatus de camiones JSONP + devoluciones
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -12,36 +12,11 @@ const CONFIG = {
 };
 
 const EVENTOS = {
-  "SALIDA_PLANTA": {
-    etiqueta: "🚚 SALIDA DE PLANTA",
-    ubicacion: "PLANTA",
-    color: "#1F4E79",
-    icono: "🚚",
-  },
-  "ADUANA_ENTRADA": {
-    etiqueta: "🛃 ENTRADA A ADUANA",
-    ubicacion: "ADUANA",
-    color: "#B8860B",
-    icono: "🛃",
-  },
-  "ADUANA_SALIDA": {
-    etiqueta: "📦 SALIDA DE ADUANA",
-    ubicacion: "EN_TRANSITO",
-    color: "#8B4513",
-    icono: "📦",
-  },
-  "ENTREGA_CEDIS": {
-    etiqueta: "✅ ENTREGA EN CEDIS",
-    ubicacion: "CEDIS",
-    color: "#1F7A1F",
-    icono: "✅",
-  },
-  "DEVOLUCION": {
-    etiqueta: "🔄 DEVOLUCIÓN",
-    ubicacion: "DEVUELTO",
-    color: "#C00000",
-    icono: "🔄",
-  },
+  "SALIDA_PLANTA": { etiqueta: "🚚 SALIDA DE PLANTA", ubicacion: "PLANTA", color: "#1F4E79", icono: "🚚" },
+  "ADUANA_ENTRADA": { etiqueta: "🛃 ENTRADA A ADUANA", ubicacion: "ADUANA", color: "#B8860B", icono: "🛃" },
+  "ADUANA_SALIDA": { etiqueta: "📦 SALIDA DE ADUANA", ubicacion: "EN_TRANSITO", color: "#8B4513", icono: "📦" },
+  "ENTREGA_CEDIS": { etiqueta: "✅ ENTREGA EN CEDIS", ubicacion: "CEDIS", color: "#1F7A1F", icono: "✅" },
+  "DEVOLUCION": { etiqueta: "🔄 DEVOLUCIÓN", ubicacion: "DEVUELTO", color: "#C00000", icono: "🔄" },
 };
 
 const MAPA_LUGARES = {
@@ -58,10 +33,6 @@ const App = (() => {
   let modoSeleccionado = null;
   let datosActuales = null;
 
-  // ═══════════════════════════════════════════════════════════
-  // SESIÓN
-  // ═══════════════════════════════════════════════════════════
-
   function getSession() {
     const s = localStorage.getItem(CONFIG.SESSION_KEY);
     return s ? JSON.parse(s) : null;
@@ -73,27 +44,19 @@ const App = (() => {
     localStorage.removeItem(CONFIG.SESSION_KEY);
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // PBKDF2
-  // ═══════════════════════════════════════════════════════════
-
   async function pbkdf2Hash(password, saltHex) {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
-      "raw", enc.encode(password),
-      { name: "PBKDF2" }, false, ["deriveBits"]
+      "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits"]
     );
     const saltBytes = new Uint8Array(
       saltHex.match(/.{1,2}/g).map(b => parseInt(b, 16))
     );
     const bits = await crypto.subtle.deriveBits(
       { name: "PBKDF2", salt: saltBytes, iterations: CONFIG.ITERACIONES, hash: "SHA-256" },
-      keyMaterial,
-      256
+      keyMaterial, 256
     );
-    return Array.from(new Uint8Array(bits))
-      .map(b => b.toString(16).padStart(2, "0"))
-      .join("");
+    return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, "0")).join("");
   }
 
   async function verificarUsuario(usuario, password) {
@@ -105,9 +68,7 @@ const App = (() => {
       const hashCalc = await pbkdf2Hash(password, user.salt);
       if (hashCalc === user.hash) {
         return {
-          user: user.user,
-          nombre: user.nombre,
-          rol: user.rol,
+          user: user.user, nombre: user.nombre, rol: user.rol,
           ubicacion: user.ubicacion || "planta",
           eventos_permitidos: user.eventos_permitidos || ["SALIDA_PLANTA"],
         };
@@ -119,34 +80,22 @@ const App = (() => {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // DESCIFRADO
-  // ═══════════════════════════════════════════════════════════
-
   function descifrarBlobQR(blobB64, password) {
     const key = CryptoJS.PBKDF2(password, CONFIG.SALT_PBKDF2, {
-      keySize: 256 / 32,
-      iterations: CONFIG.ITERACIONES,
-      hasher: CryptoJS.algo.SHA256
+      keySize: 256 / 32, iterations: CONFIG.ITERACIONES, hasher: CryptoJS.algo.SHA256
     });
-
     let normalized = blobB64.replace(/-/g, "+").replace(/_/g, "/");
     while (normalized.length % 4 !== 0) normalized += "=";
     const combined = CryptoJS.enc.Base64.parse(normalized);
-
     const combinedHex = combined.toString(CryptoJS.enc.Hex);
     const ivHex = combinedHex.substring(0, 32);
     const ciphertextHex = combinedHex.substring(32);
-
     const iv = CryptoJS.enc.Hex.parse(ivHex);
     const ciphertext = CryptoJS.enc.Hex.parse(ciphertextHex);
-
     const decrypted = CryptoJS.AES.decrypt(
-      { ciphertext: ciphertext },
-      key,
+      { ciphertext: ciphertext }, key,
       { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
     );
-
     const texto = decrypted.toString(CryptoJS.enc.Utf8);
     if (!texto) throw new Error("Contraseña incorrecta o datos corruptos");
     return JSON.parse(texto);
@@ -157,27 +106,23 @@ const App = (() => {
     texto.split("|").forEach(p => {
       const idx = p.indexOf(":");
       if (idx > 0) {
-        const k = p.substring(0, idx).trim();
-        const v = p.substring(idx + 1).trim();
-        partes[k] = v;
+        partes[p.substring(0, idx).trim()] = p.substring(idx + 1).trim();
       }
     });
-
     let lotes = [];
     if (partes.LOTES) {
       partes.LOTES.split(",").forEach(l => {
         const idx = l.indexOf(":");
         if (idx > 0) {
-          const lote = l.substring(0, idx).trim();
-          const pz = parseInt(l.substring(idx + 1).trim()) || 0;
-          lotes.push({ lote: lote, pz: pz });
+          lotes.push({
+            lote: l.substring(0, idx).trim(),
+            pz: parseInt(l.substring(idx + 1).trim()) || 0
+          });
         }
       });
     }
-
     const dc = partes.DC || "";
     const tarima = partes.TARIMA || "";
-
     return {
       o: dc, l: tarima,
       po: partes.PO || "",
@@ -193,10 +138,6 @@ const App = (() => {
       es_pt: true,
     };
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // LOGIN
-  // ═══════════════════════════════════════════════════════════
 
   function initLogin() {
     if (getSession()) {
@@ -226,10 +167,6 @@ const App = (() => {
     });
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // SCANNER
-  // ═══════════════════════════════════════════════════════════
-
   let stream = null;
   let scanning = false;
 
@@ -240,8 +177,7 @@ const App = (() => {
       return;
     }
 
-    document.getElementById("user-info").textContent =
-      `${session.nombre} (${session.rol})`;
+    document.getElementById("user-info").textContent = `${session.nombre} (${session.rol})`;
 
     document.getElementById("btn-logout").addEventListener("click", () => {
       clearSession();
@@ -263,14 +199,9 @@ const App = (() => {
       mostrarVista("view-ready");
     });
 
-    // Botones de estatus
     document.getElementById("btn-ver-estatus").addEventListener("click", verEstatusCamiones);
-    document.getElementById("btn-cerrar-estatus").addEventListener("click", () => {
-      mostrarVista("view-ready");
-    });
-    document.getElementById("btn-cerrar-detalle").addEventListener("click", () => {
-      verEstatusCamiones();
-    });
+    document.getElementById("btn-cerrar-estatus").addEventListener("click", () => mostrarVista("view-ready"));
+    document.getElementById("btn-cerrar-detalle").addEventListener("click", verEstatusCamiones);
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").then(reg => {
@@ -292,21 +223,18 @@ const App = (() => {
     }
 
     const eventos = session.eventos_permitidos || ["SALIDA_PLANTA"];
-
     if (eventos.length === 0) {
       alert("Tu usuario no tiene eventos asignados. Contacta al administrador.");
       clearSession();
       window.location.href = "index.html";
       return;
     }
-
     if (eventos.length === 1) {
       modoSeleccionado = eventos[0];
       aplicarModo(EVENTOS[modoSeleccionado]);
       mostrarVista("view-ready");
       return;
     }
-
     mostrarSelector(eventos);
   }
 
@@ -326,7 +254,6 @@ const App = (() => {
     eventos.forEach(ev => {
       const info = EVENTOS[ev];
       if (!info) return;
-
       const btn = document.createElement("button");
       btn.className = "btn-evento";
       btn.style.background = info.color;
@@ -380,9 +307,7 @@ const App = (() => {
   async function iniciarCamara() {
     mostrarVista("view-scanning");
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" }
-      });
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
       const video = document.getElementById("qr-video");
       video.srcObject = stream;
       video.setAttribute("playsinline", true);
@@ -434,7 +359,6 @@ const App = (() => {
 
     try {
       let datos = null;
-
       if (datosQR.includes("PO:") && datosQR.includes("|")) {
         datos = parsearQRPT(datosQR);
       } else {
@@ -491,42 +415,58 @@ const App = (() => {
     const info = EVENTOS[modoSeleccionado];
 
     document.getElementById("result-titulo").textContent = "OK: " + info.etiqueta;
-    document.getElementById("result-subtitulo").textContent =
-      (datos.dc ? "DC " + datos.dc : "") + " " + (datos.s || "");
-
+    document.getElementById("result-subtitulo").textContent = (datos.dc ? "DC " + datos.dc : "") + " " + (datos.s || "");
     document.getElementById("meta-evento").textContent = modoSeleccionado;
     document.getElementById("meta-ubicacion").textContent = info.ubicacion;
     document.getElementById("meta-fecha").textContent = fecha + " " + hora;
-
     document.getElementById("meta-camion").textContent = datos.c || datos.camion || "-";
     document.getElementById("meta-dc").textContent = datos.dc || "-";
     document.getElementById("meta-sabor").textContent = datos.s || "-";
-
     document.getElementById("meta-lote").textContent =
       (datos.lotes && datos.lotes.length > 0)
         ? datos.lotes.map(l => l.lote + " (" + l.pz + " PZ)").join(", ")
         : (datos.lote || datos.l || "-");
-
     document.getElementById("meta-tarima").textContent = datos.num_tarima || datos.t || "-";
     document.getElementById("meta-po").textContent = datos.po || "-";
-
     mostrarVista("view-result");
   }
 
   // ═══════════════════════════════════════════════════════════
-  // ESTATUS DE CAMIONES
+  // ESTATUS DE CAMIONES (con JSONP)
   // ═══════════════════════════════════════════════════════════
+
+  function jsonp(url) {
+    return new Promise((resolve, reject) => {
+      const callbackName = "jsonp_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+      window[callbackName] = (data) => {
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        resolve(data);
+      };
+      const script = document.createElement("script");
+      script.src = url + "&callback=" + callbackName;
+      script.onerror = () => {
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        reject(new Error("Error de red"));
+      };
+      document.body.appendChild(script);
+      setTimeout(() => {
+        if (window[callbackName]) {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
+          reject(new Error("Timeout"));
+        }
+      }, 15000);
+    });
+  }
 
   async function verEstatusCamiones() {
     mostrarVista("view-loading");
     document.getElementById("loading-text").textContent = "Cargando estatus...";
-
     try {
-      const resp = await fetch(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camiones");
-      const data = await resp.json();
-
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camiones");
       if (!data.ok) throw new Error("Error al cargar estatus");
-
       mostrarListaCamiones(data.camiones);
     } catch (e) {
       alert("Error al cargar estatus:\n\n" + e.message);
@@ -552,10 +492,7 @@ const App = (() => {
       titulo.textContent = "🔥 Camiones Activos";
       titulo.style.marginTop = "10px";
       contenedor.appendChild(titulo);
-
-      activos.forEach(c => {
-        contenedor.appendChild(crearTarjetaCamion(c));
-      });
+      activos.forEach(c => contenedor.appendChild(crearTarjetaCamion(c)));
     }
 
     if (completados.length > 0) {
@@ -563,16 +500,13 @@ const App = (() => {
       titulo.textContent = "✅ Camiones Completados";
       titulo.style.marginTop = "20px";
       contenedor.appendChild(titulo);
-
-      completados.slice(0, 10).forEach(c => {
-        contenedor.appendChild(crearTarjetaCamion(c));
-      });
+      completados.slice(0, 10).forEach(c => contenedor.appendChild(crearTarjetaCamion(c)));
     }
 
     mostrarVista("view-estatus");
   }
 
-    function crearTarjetaCamion(camion) {
+  function crearTarjetaCamion(camion) {
     const card = document.createElement("div");
     card.className = "camion-card";
     if (camion.activo) card.classList.add("activo");
@@ -586,17 +520,11 @@ const App = (() => {
       const info = EVENTOS[ev];
       const e = camion.eventos[ev];
       if (!info || !e) return;
-
-      // Solo mostrar devolución si tiene registros
       if (ev === "DEVOLUCION" && e.registradas === 0) return;
 
       const cls = e.completado ? "completado" : "pendiente";
-
-      // Texto adicional de faltantes
       let faltanTexto = "";
-      if (!e.completado && e.registradas > 0) {
-        faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
-      } else if (!e.completado && e.registradas === 0) {
+      if (!e.completado) {
         faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
       }
 
@@ -610,22 +538,16 @@ const App = (() => {
 
     html += '</div>';
     card.innerHTML = html;
-
     card.addEventListener("click", () => verDetalleCamion(camion.camion));
-
     return card;
   }
 
   async function verDetalleCamion(camion) {
     mostrarVista("view-loading");
     document.getElementById("loading-text").textContent = "Cargando detalle...";
-
     try {
-      const resp = await fetch(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
-      const data = await resp.json();
-
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
       if (!data.ok) throw new Error("Error al cargar detalle");
-
       mostrarDetalleCamion(data);
     } catch (e) {
       alert("Error al cargar detalle:\n\n" + e.message);
@@ -633,7 +555,7 @@ const App = (() => {
     }
   }
 
-    function mostrarDetalleCamion(data) {
+  function mostrarDetalleCamion(data) {
     document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
 
     const contenedor = document.getElementById("detalle-camion");
@@ -650,12 +572,9 @@ const App = (() => {
       const info = EVENTOS[ev];
       const e = data.eventos[ev];
       if (!info || !e) return;
-
-      // Solo mostrar devolución si tiene registros
       if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
 
-      let status;
-      let clase;
+      let status, clase;
       if (e.completado) {
         status = "✅ COMPLETADO";
         clase = "completado";
@@ -675,9 +594,7 @@ const App = (() => {
       if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
         html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary>';
         html += '<ul class="lista-faltantes">';
-        e.faltantes.forEach(q => {
-          html += '<li>' + q + '</li>';
-        });
+        e.faltantes.forEach(q => { html += '<li>' + q + '</li>'; });
         html += '</ul></details>';
       } else if (e.faltantes.length > 30) {
         html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
@@ -691,5 +608,4 @@ const App = (() => {
   }
 
   return { initLogin, initScanner };
-
 })();
