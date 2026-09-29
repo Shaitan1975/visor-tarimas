@@ -572,7 +572,7 @@ const App = (() => {
     mostrarVista("view-estatus");
   }
 
-  function crearTarjetaCamion(camion) {
+    function crearTarjetaCamion(camion) {
     const card = document.createElement("div");
     card.className = "camion-card";
     if (camion.activo) card.classList.add("activo");
@@ -587,15 +587,22 @@ const App = (() => {
       const e = camion.eventos[ev];
       if (!info || !e) return;
 
-      const pct = e.total > 0 ? Math.round((e.registradas / e.total) * 100) : 0;
-      const cls = e.completado ? "completado" : "pendiente";
-
       // Solo mostrar devolución si tiene registros
       if (ev === "DEVOLUCION" && e.registradas === 0) return;
 
+      const cls = e.completado ? "completado" : "pendiente";
+
+      // Texto adicional de faltantes
+      let faltanTexto = "";
+      if (!e.completado && e.registradas > 0) {
+        faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
+      } else if (!e.completado && e.registradas === 0) {
+        faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
+      }
+
       html += '<div class="evento-linea ' + cls + '">' +
               '<span class="evento-icono">' + info.icono + '</span>' +
-              '<span class="evento-nombre">' + info.etiqueta + '</span>' +
+              '<span class="evento-nombre">' + info.etiqueta + ' ' + faltanTexto + '</span>' +
               '<span class="evento-progreso">' + e.registradas + '/' + e.total + '</span>' +
               '<span class="evento-check">' + (e.completado ? '✅' : '⏳') + '</span>' +
               '</div>';
