@@ -350,3 +350,170 @@ html, body {
   display: block;
   margin-top: 6px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   ESTATUS DE CAMIONES (v12)
+   ═══════════════════════════════════════════════════════════ */
+
+.estatus-container {
+  background: white;
+  border-radius: var(--radio);
+  padding: 20px;
+  margin: 16px auto;
+  max-width: 600px;
+  box-shadow: var(--sombra);
+}
+
+.estatus-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--gris-borde);
+}
+
+.estatus-header h2 {
+  color: var(--azul-primario);
+  font-size: 18px;
+  margin: 0;
+}
+
+.btn-cerrar {
+  background: #C00000;
+  color: white;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.camion-card {
+  background: #F9FAFB;
+  border-left: 4px solid var(--azul-primario);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+
+.camion-card:active {
+  transform: scale(0.98);
+}
+
+.camion-card.activo {
+  border-left-color: #ED8936;
+  background: #FFF8F0;
+}
+
+.camion-titulo {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--azul-primario);
+  margin-bottom: 8px;
+}
+
+.camion-total {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--gris-texto);
+}
+
+.eventos-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.evento-linea {
+  display: grid;
+  grid-template-columns: 24px 1fr 60px 24px;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.evento-linea.completado {
+  color: #1F7A1F;
+}
+
+.evento-linea.pendiente {
+  color: var(--gris-texto);
+}
+
+.evento-icono {
+  font-size: 16px;
+}
+
+.evento-nombre {
+  font-weight: 600;
+}
+
+.evento-progreso {
+  text-align: right;
+  font-family: monospace;
+  font-weight: 700;
+}
+
+.evento-check {
+  text-align: center;
+}
+
+.detalle-info {
+  background: #F2F2F2;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.detalle-info p {
+  margin: 4px 0;
+  font-size: 14px;
+}
+
+.detalle-evento {
+  background: #F9FAFB;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.detalle-evento h4 {
+  color: var(--azul-primario);
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.detalle-numero {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--azul-claro);
+  text-align: right;
+  margin: 4px 0;
+}
+
+.lista-faltantes {
+  font-size: 11px;
+  color: var(--gris-texto);
+  margin: 8px 0;
+  padding-left: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.texto-faltantes {
+  font-size: 12px;
+  color: var(--gris-texto);
+  font-style: italic;
+}
+
+details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--azul-claro);
+  margin-top: 8px;
+}
