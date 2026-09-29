@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v15)
-// Con JSONP + validación de duplicados
+// VISOR TARIMAS - LÓGICA DE LA PWA (v17)
+// Con lista de tarimas en progreso
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -8,7 +8,8 @@ const CONFIG = {
   CLAVE_EMPRESA: "MediesE2026$Almacen",
   SALT_PBKDF2: "salt-fijo-empresa-2026",
   ITERACIONES: 100000,
-  SESSION_KEY: "visor_tarimas_session"
+  SESSION_KEY: "visor_tarimas_session",
+  CAMION_KEY: "visor_tarimas_camion_actual"
 };
 
 const EVENTOS = {
@@ -42,6 +43,18 @@ const App = (() => {
   }
   function clearSession() {
     localStorage.removeItem(CONFIG.SESSION_KEY);
+  }
+
+  function getCamionActual() {
+    return localStorage.getItem(CONFIG.CAMION_KEY) || null;
+  }
+  function setCamionActual(camion) {
+    if (camion) {
+      localStorage.setItem(CONFIG.CAMION_KEY, camion);
+    }
+  }
+  function limpiarCamionActual() {
+    localStorage.removeItem(CONFIG.CAMION_KEY);
   }
 
   async function pbkdf2Hash(password, saltHex) {
@@ -209,7 +222,6 @@ const App = (() => {
       }).catch(() => {});
     }
 
-    // Refrescar estatus cuando la app gana el foco
     window.addEventListener("focus", () => {
       const estatusVisible = !document.getElementById("view-estatus").classList.contains("hidden");
       if (estatusVisible) {
@@ -310,6 +322,10 @@ const App = (() => {
         if (el) el.classList.add("hidden");
       });
     document.getElementById(id).classList.remove("hidden");
+
+    if (id === "view-ready") {
+      actualizarProgresoPantalla();
+    }
   }
 
   async function iniciarCamara() {
@@ -414,6 +430,11 @@ const App = (() => {
         }
       }
 
+      // Guardar camión actual
+      if (payload.camion) {
+        setCamionActual(payload.camion);
+      }
+
       setTimeout(() => mostrarExito(datos, session), 500);
 
     } catch (e) {
@@ -447,6 +468,96 @@ const App = (() => {
     mostrarVista("view-result");
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // PROGRESO EN PANTALLA PRINCIPAL
+  // ═══════════════════════════════════════════════════════════
+
+  async function actualizarProgresoPantalla() {
+    const camion = getCamionActual();
+    const contenedor = document.getElementById("progreso-camion");
+
+    if (!contenedor) return;
+
+    if (!camion) {
+      contenedor.innerHTML = "";
+      contenedor.classList.add("hidden");
+      return;
+    }
+
+    contenedor.classList.remove("hidden");
+    contenedor.innerHTML = '<div class="progreso-loading">⏳ Cargando progreso...</div>';
+
+    try {
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
+
+      if (!data.ok) throw new Error("Error");
+
+      const eventoActual = modoSeleccionado || "SALIDA_PLANTA";
+      const info = EVENTOS[eventoActual];
+      const ev = data.eventos[eventoActual];
+
+      if (!ev) throw new Error("Evento no encontrado");
+
+      const pct = ev.total > 0 ? Math.round((ev.registradas.length / ev.total) * 100) : 0;
+      const completado = ev.completado;
+
+      let html = '<div class="progreso-titulo">';
+      html += '<span class="progreso-icono">🚚</span>';
+      html += '<span class="progreso-camion">' + camion + '</span>';
+      html += '<span class="progreso-evento">' + info.icono + ' ' + info.etiqueta + '</span>';
+      html += '</div>';
+
+      html += '<div class="progreso-barra">';
+      html += '<div class="progreso-barra-relleno" style="width: ' + pct + '%;"></div>';
+      html += '</div>';
+
+      html += '<div class="progreso-numeros">';
+      if (completado) {
+        html += '<span class="progreso-completo">✅ COMPLETADO ' + ev.registradas.length + '/' + ev.total + '</span>';
+      } else {
+        html += '<span class="progreso-conteo">📊 ' + ev.registradas.length + '/' + ev.total + '</span>';
+        html += '<span class="progreso-faltan">⏳ Faltan ' + ev.faltantes.length + '</span>';
+      }
+      html += '</div>';
+
+      // Lista de tarimas registradas
+      if (ev.registradas.length > 0) {
+        html += '<div class="progreso-lista-titulo">';
+        html += '<span>✅ Registradas (' + ev.registradas.length + '):</span>';
+        html += '</div>';
+        html += '<div class="progreso-lista">';
+        ev.registradas.slice().reverse().forEach(qr => {
+          html += '<span class="chip-registrada">✅ ' + qr + '</span>';
+        });
+        html += '</div>';
+      }
+
+      // Lista de faltantes (primeras 10)
+      if (ev.faltantes.length > 0 && !completado) {
+        html += '<div class="progreso-lista-titulo">';
+        html += '<span>⏳ Faltantes (' + ev.faltantes.length + '):</span>';
+        html += '</div>';
+        html += '<div class="progreso-lista progreso-lista-faltantes">';
+        ev.faltantes.slice(0, 10).forEach(qr => {
+          html += '<span class="chip-faltante">⏳ ' + qr + '</span>';
+        });
+        if (ev.faltantes.length > 10) {
+          html += '<span class="chip-mas">+ ' + (ev.faltantes.length - 10) + ' más...</span>';
+        }
+        html += '</div>';
+      }
+
+      contenedor.innerHTML = html;
+
+    } catch (e) {
+      contenedor.innerHTML = '<div class="progreso-error">⚠️ Error al cargar progreso</div>';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // JSONP
+  // ═══════════════════════════════════════════════════════════
+
   function jsonp(url) {
     return new Promise((resolve, reject) => {
       const callbackName = "jsonp_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
@@ -472,6 +583,10 @@ const App = (() => {
       }, 15000);
     });
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // ESTATUS DE CAMIONES
+  // ═══════════════════════════════════════════════════════════
 
   async function verEstatusCamiones() {
     mostrarVista("view-loading");
