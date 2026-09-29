@@ -565,3 +565,61 @@ details summary {
 .detalle-evento.pendiente .detalle-status {
   color: #4A5568;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   LISTA DE TARIMAS EN PROGRESO (v17)
+   ═══════════════════════════════════════════════════════════ */
+
+.progreso-lista-titulo {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1F4E79;
+  margin-top: 10px;
+  margin-bottom: 6px;
+}
+
+.progreso-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.progreso-lista-faltantes {
+  opacity: 0.8;
+}
+
+.chip-registrada {
+  display: inline-block;
+  background: #C6EFCE;
+  color: #1F7A1F;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  border: 1px solid #7DC67D;
+}
+
+.chip-faltante {
+  display: inline-block;
+  background: #FFF3CD;
+  color: #856404;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  border: 1px solid #FFD966;
+}
+
+.chip-mas {
+  display: inline-block;
+  background: #E0E4EA;
+  color: #4A5568;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-style: italic;
+}
