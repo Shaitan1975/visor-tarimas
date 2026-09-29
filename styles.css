@@ -517,3 +517,51 @@ details summary {
   color: var(--azul-claro);
   margin-top: 8px;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   FALTANTES EN ESTATUS (v13)
+   ═══════════════════════════════════════════════════════════ */
+
+.evento-faltan {
+  font-size: 10px;
+  color: #C00000;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.evento-linea.completado .evento-faltan {
+  display: none;
+}
+
+.detalle-evento.parcial {
+  background: #FFF8F0;
+  border-left: 3px solid #ED8936;
+}
+
+.detalle-evento.completado {
+  background: #F0FDF4;
+  border-left: 3px solid #22C55E;
+}
+
+.detalle-evento.pendiente {
+  background: #F9FAFB;
+  border-left: 3px solid #E0E4EA;
+}
+
+.detalle-status {
+  font-size: 12px;
+  font-weight: 700;
+  margin: 4px 0;
+}
+
+.detalle-evento.completado .detalle-status {
+  color: #1F7A1F;
+}
+
+.detalle-evento.parcial .detalle-status {
+  color: #ED8936;
+}
+
+.detalle-evento.pendiente .detalle-status {
+  color: #4A5568;
+}
