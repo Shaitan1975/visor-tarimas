@@ -1,7 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v9)
-// Detecta el rol del usuario y muestra los eventos permitidos
-// Empresa: Mediese
+// VISOR TARIMAS - LÓGICA DE LA PWA (v12)
+// Con pantalla de estatus de camiones + devoluciones
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -12,7 +11,6 @@ const CONFIG = {
   SESSION_KEY: "visor_tarimas_session"
 };
 
-// Catálogo de eventos posibles
 const EVENTOS = {
   "SALIDA_PLANTA": {
     etiqueta: "🚚 SALIDA DE PLANTA",
@@ -38,24 +36,26 @@ const EVENTOS = {
     color: "#1F7A1F",
     icono: "✅",
   },
+  "DEVOLUCION": {
+    etiqueta: "🔄 DEVOLUCIÓN",
+    ubicacion: "DEVUELTO",
+    color: "#C00000",
+    icono: "🔄",
+  },
 };
 
-// Modos por URL (compatibilidad)
 const MAPA_LUGARES = {
   "planta": "SALIDA_PLANTA",
   "aduana-entrada": "ADUANA_ENTRADA",
   "aduana-salida": "ADUANA_SALIDA",
   "cedis": "ENTREGA_CEDIS",
+  "devolucion": "DEVOLUCION",
 };
 
 const App = (() => {
 
-  // ═══════════════════════════════════════════════════════════
-  // ESTADO
-  // ═══════════════════════════════════════════════════════════
-
   let modoActual = null;
-  let modoSeleccionado = null;  // Evento elegido en el selector
+  let modoSeleccionado = null;
   let datosActuales = null;
 
   // ═══════════════════════════════════════════════════════════
@@ -248,7 +248,6 @@ const App = (() => {
       window.location.href = "index.html";
     });
 
-    // Botones del selector
     const btnCambiar = document.getElementById("btn-cambiar-evento");
     if (btnCambiar) {
       btnCambiar.addEventListener("click", () => {
@@ -257,7 +256,6 @@ const App = (() => {
       });
     }
 
-    // Botones del escaneo
     document.getElementById("btn-start-scan").addEventListener("click", iniciarCamara);
     document.getElementById("btn-cancel-scan").addEventListener("click", cancelarCamara);
     document.getElementById("btn-scan-again").addEventListener("click", () => {
@@ -265,27 +263,25 @@ const App = (() => {
       mostrarVista("view-ready");
     });
 
+    // Botones de estatus
+    document.getElementById("btn-ver-estatus").addEventListener("click", verEstatusCamiones);
+    document.getElementById("btn-cerrar-estatus").addEventListener("click", () => {
+      mostrarVista("view-ready");
+    });
+    document.getElementById("btn-cerrar-detalle").addEventListener("click", () => {
+      verEstatusCamiones();
+    });
+
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").then(reg => {
-        // Forzar chequeo de actualización cada vez que abre la app
         reg.update().catch(() => {});
       }).catch(() => {});
-
-      // Recargar automáticamente cuando haya una versión nueva activa
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener("controllerchange", () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
-      });
     }
 
     iniciarFlujo(session);
   }
 
   function iniciarFlujo(session) {
-    // 1. Prioridad: URL ?lugar=
     const params = new URLSearchParams(window.location.search);
     const lugarParam = params.get("lugar");
     if (lugarParam && MAPA_LUGARES[lugarParam]) {
@@ -295,7 +291,6 @@ const App = (() => {
       return;
     }
 
-    // 2. Eventos permitidos del usuario
     const eventos = session.eventos_permitidos || ["SALIDA_PLANTA"];
 
     if (eventos.length === 0) {
@@ -306,26 +301,22 @@ const App = (() => {
     }
 
     if (eventos.length === 1) {
-      // Solo 1 evento: ir directo
       modoSeleccionado = eventos[0];
       aplicarModo(EVENTOS[modoSeleccionado]);
       mostrarVista("view-ready");
       return;
     }
 
-    // Varios eventos: mostrar selector
     mostrarSelector(eventos);
   }
 
   function mostrarSelector(eventos) {
-    // Ocultar todas las vistas
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector"]
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion"]
       .forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add("hidden");
       });
 
-    // Ocultar banner
     const banner = document.getElementById("modo-indicador");
     if (banner) banner.style.display = "none";
 
@@ -352,7 +343,6 @@ const App = (() => {
   }
 
   function aplicarModo(info) {
-    // Banner
     const banner = document.getElementById("modo-indicador");
     const texto = document.getElementById("modo-texto");
     const icono = document.getElementById("modo-icono");
@@ -362,10 +352,8 @@ const App = (() => {
     if (icono) icono.textContent = info.icono;
     if (banner) banner.style.background = info.color;
 
-    // Botón "Cambiar evento"
     const btnCambiar = document.getElementById("btn-cambiar-evento");
     if (btnCambiar) {
-      // Solo mostrar si el usuario tiene más de 1 evento
       const session = getSession();
       if (session && session.eventos_permitidos && session.eventos_permitidos.length > 1) {
         btnCambiar.classList.remove("hidden");
@@ -374,7 +362,6 @@ const App = (() => {
       }
     }
 
-    // Textos
     const readyTitulo = document.getElementById("ready-titulo");
     const readyDesc = document.getElementById("ready-descripcion");
     if (readyTitulo) readyTitulo.textContent = info.etiqueta;
@@ -382,7 +369,7 @@ const App = (() => {
   }
 
   function mostrarVista(id) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector"]
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion"]
       .forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add("hidden");
@@ -459,13 +446,12 @@ const App = (() => {
 
       const payload = {
         accion: "evento",
-        qr_id: datos.qr_id || (datos.camion || "") + "-DC" + (datos.dc || "") + "-" + (datos.s || "") + "-T" + (datos.num_tarima || ""),
+        qr_id: (datos.camion || "") + "-DC" + (datos.dc || "") + "-" + (datos.s || "") + "-T" + (parseInt(datos.num_tarima) || datos.num_tarima || ""),
         camion: datos.c || datos.camion || "",
         po: datos.po || "",
         cedis: datos.cedis || "",
         dc: datos.dc || datos.g || datos.o || "",
         sabor: datos.s || datos.sabor || "",
-        lote: datos.lote || (datos.lotes && datos.lotes[0] ? datos.lotes[0].lote : ""),
         num_tarima: datos.num_tarima || datos.t || 0,
         evento: modoSeleccionado,
         usuario: session.user,
@@ -525,6 +511,164 @@ const App = (() => {
     document.getElementById("meta-po").textContent = datos.po || "-";
 
     mostrarVista("view-result");
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ESTATUS DE CAMIONES
+  // ═══════════════════════════════════════════════════════════
+
+  async function verEstatusCamiones() {
+    mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Cargando estatus...";
+
+    try {
+      const resp = await fetch(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camiones");
+      const data = await resp.json();
+
+      if (!data.ok) throw new Error("Error al cargar estatus");
+
+      mostrarListaCamiones(data.camiones);
+    } catch (e) {
+      alert("Error al cargar estatus:\n\n" + e.message);
+      mostrarVista("view-ready");
+    }
+  }
+
+  function mostrarListaCamiones(camiones) {
+    const contenedor = document.getElementById("lista-camiones");
+    contenedor.innerHTML = "";
+
+    const activos = camiones.filter(c => c.activo);
+    const completados = camiones.filter(c => !c.activo);
+
+    if (activos.length === 0 && completados.length === 0) {
+      contenedor.innerHTML = '<p style="text-align:center;padding:20px;">No hay camiones registrados.</p>';
+      mostrarVista("view-estatus");
+      return;
+    }
+
+    if (activos.length > 0) {
+      const titulo = document.createElement("h3");
+      titulo.textContent = "🔥 Camiones Activos";
+      titulo.style.marginTop = "10px";
+      contenedor.appendChild(titulo);
+
+      activos.forEach(c => {
+        contenedor.appendChild(crearTarjetaCamion(c));
+      });
+    }
+
+    if (completados.length > 0) {
+      const titulo = document.createElement("h3");
+      titulo.textContent = "✅ Camiones Completados";
+      titulo.style.marginTop = "20px";
+      contenedor.appendChild(titulo);
+
+      completados.slice(0, 10).forEach(c => {
+        contenedor.appendChild(crearTarjetaCamion(c));
+      });
+    }
+
+    mostrarVista("view-estatus");
+  }
+
+  function crearTarjetaCamion(camion) {
+    const card = document.createElement("div");
+    card.className = "camion-card";
+    if (camion.activo) card.classList.add("activo");
+
+    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
+
+    let html = '<div class="camion-titulo">🚚 ' + camion.camion + ' <span class="camion-total">(' + camion.total_tarimas + ' tarimas)</span></div>';
+    html += '<div class="eventos-lista">';
+
+    EVS.forEach(ev => {
+      const info = EVENTOS[ev];
+      const e = camion.eventos[ev];
+      if (!info || !e) return;
+
+      const pct = e.total > 0 ? Math.round((e.registradas / e.total) * 100) : 0;
+      const cls = e.completado ? "completado" : "pendiente";
+
+      // Solo mostrar devolución si tiene registros
+      if (ev === "DEVOLUCION" && e.registradas === 0) return;
+
+      html += '<div class="evento-linea ' + cls + '">' +
+              '<span class="evento-icono">' + info.icono + '</span>' +
+              '<span class="evento-nombre">' + info.etiqueta + '</span>' +
+              '<span class="evento-progreso">' + e.registradas + '/' + e.total + '</span>' +
+              '<span class="evento-check">' + (e.completado ? '✅' : '⏳') + '</span>' +
+              '</div>';
+    });
+
+    html += '</div>';
+    card.innerHTML = html;
+
+    card.addEventListener("click", () => verDetalleCamion(camion.camion));
+
+    return card;
+  }
+
+  async function verDetalleCamion(camion) {
+    mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Cargando detalle...";
+
+    try {
+      const resp = await fetch(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
+      const data = await resp.json();
+
+      if (!data.ok) throw new Error("Error al cargar detalle");
+
+      mostrarDetalleCamion(data);
+    } catch (e) {
+      alert("Error al cargar detalle:\n\n" + e.message);
+      verEstatusCamiones();
+    }
+  }
+
+  function mostrarDetalleCamion(data) {
+    document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
+
+    const contenedor = document.getElementById("detalle-camion");
+    contenedor.innerHTML = "";
+
+    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
+
+    let html = '<div class="detalle-info">' +
+               '<p><b>PO:</b> ' + (data.po || '-') + '</p>' +
+               '<p><b>Total tarimas:</b> ' + data.total_tarimas + '</p>' +
+               '</div>';
+
+    EVS.forEach(ev => {
+      const info = EVENTOS[ev];
+      const e = data.eventos[ev];
+      if (!info || !e) return;
+
+      // Solo mostrar devolución si tiene registros
+      if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
+
+      const status = e.completado ? "✅ COMPLETADO" : "⏳ FALTAN " + e.faltantes.length;
+
+      html += '<div class="detalle-evento">';
+      html += '<h4>' + info.icono + ' ' + info.etiqueta + ' - ' + status + '</h4>';
+      html += '<p class="detalle-numero">' + e.registradas.length + '/' + e.total + '</p>';
+
+      if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
+        html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary>';
+        html += '<ul class="lista-faltantes">';
+        e.faltantes.forEach(q => {
+          html += '<li>' + q + '</li>';
+        });
+        html += '</ul></details>';
+      } else if (e.faltantes.length > 30) {
+        html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
+      }
+
+      html += '</div>';
+    });
+
+    contenedor.innerHTML = html;
+    mostrarVista("view-detalle-camion");
   }
 
   return { initLogin, initScanner };
