@@ -238,6 +238,15 @@ const App = (() => {
     mostrarSelector(eventos);
   }
 
+      // Refrescar estatus cada vez que la app gana el foco
+    window.addEventListener("focus", () => {
+      const estatusVisible = !document.getElementById("view-estatus").classList.contains("hidden");
+      const detalleVisible = !document.getElementById("view-detalle-camion").classList.contains("hidden");
+      if (estatusVisible) {
+        verEstatusCamiones();
+      }
+    });
+  
   function mostrarSelector(eventos) {
     ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion"]
       .forEach(v => {
