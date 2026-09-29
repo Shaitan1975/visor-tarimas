@@ -45,6 +45,29 @@
       <p id="ready-descripcion">Toca el botón para activar la cámara.</p>
       <button id="btn-start-scan" class="btn-primary btn-large">🎥 Escanear QR</button>
       <button id="btn-cambiar-evento" class="btn-secondary hidden">🔄 Cambiar evento</button>
+      <button id="btn-ver-estatus" class="btn-secondary">📊 Ver estatus de camiones</button>
+    </div>
+  </section>
+
+  <!-- Vista: ESTATUS CAMIONES -->
+  <section id="view-estatus" class="view-section hidden">
+    <div class="estatus-container">
+      <div class="estatus-header">
+        <h2>📊 Estatus de Camiones</h2>
+        <button id="btn-cerrar-estatus" class="btn-cerrar">✖</button>
+      </div>
+      <div id="lista-camiones" class="lista-camiones"></div>
+    </div>
+  </section>
+
+  <!-- Vista: DETALLE CAMION -->
+  <section id="view-detalle-camion" class="view-section hidden">
+    <div class="estatus-container">
+      <div class="estatus-header">
+        <h2 id="detalle-titulo">Camión</h2>
+        <button id="btn-cerrar-detalle" class="btn-cerrar">✖</button>
+      </div>
+      <div id="detalle-camion"></div>
     </div>
   </section>
 
