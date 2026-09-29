@@ -353,7 +353,7 @@ const App = (() => {
     requestAnimationFrame(tick);
   }
 
-  async function procesarQR(datosQR) {
+    async function procesarQR(datosQR) {
     mostrarVista("view-loading");
     document.getElementById("loading-text").textContent = "Registrando evento...";
 
@@ -388,15 +388,25 @@ const App = (() => {
         payload.lotes = datos.lotes;
       }
 
-      const formData = new URLSearchParams();
-      formData.append("data", JSON.stringify(payload));
+      // Enviar con JSONP para poder leer la respuesta
+      const url = CONFIG.APPS_SCRIPT_URL
+        + "?accion=evento"
+        + "&data=" + encodeURIComponent(JSON.stringify(payload));
 
-      await fetch(CONFIG.APPS_SCRIPT_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData.toString()
-      });
+      const respuesta = await jsonp(url);
+
+      if (!respuesta.ok) {
+        if (respuesta.duplicado) {
+          // Mostrar aviso de duplicado
+          setTimeout(() => {
+            alert("⚠️ TARIMA YA REGISTRADA\n\n" + respuesta.mensaje + "\n\nRegistrada el: " + respuesta.fecha_anterior);
+            mostrarVista("view-ready");
+          }, 300);
+          return;
+        } else {
+          throw new Error(respuesta.error || "Error desconocido");
+        }
+      }
 
       setTimeout(() => mostrarExito(datos, session), 500);
 
