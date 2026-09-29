@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════
-// SERVICE WORKER - Visor Tarimas v6
+// SERVICE WORKER - Visor Tarimas v7
 // ═══════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'visor-v6';
+const CACHE_VERSION = 'visor-v7';
 const CACHE_NAME = CACHE_VERSION;
 
 const ARCHIVOS_CACHE = [
