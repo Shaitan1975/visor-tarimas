@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v14)
-// Con estatus de camiones JSONP + devoluciones
+// VISOR TARIMAS - LÓGICA DE LA PWA (v15)
+// Con JSONP + validación de duplicados
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -209,6 +209,14 @@ const App = (() => {
       }).catch(() => {});
     }
 
+    // Refrescar estatus cuando la app gana el foco
+    window.addEventListener("focus", () => {
+      const estatusVisible = !document.getElementById("view-estatus").classList.contains("hidden");
+      if (estatusVisible) {
+        verEstatusCamiones();
+      }
+    });
+
     iniciarFlujo(session);
   }
 
@@ -238,15 +246,6 @@ const App = (() => {
     mostrarSelector(eventos);
   }
 
-      // Refrescar estatus cada vez que la app gana el foco
-    window.addEventListener("focus", () => {
-      const estatusVisible = !document.getElementById("view-estatus").classList.contains("hidden");
-      const detalleVisible = !document.getElementById("view-detalle-camion").classList.contains("hidden");
-      if (estatusVisible) {
-        verEstatusCamiones();
-      }
-    });
-  
   function mostrarSelector(eventos) {
     ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion"]
       .forEach(v => {
@@ -362,7 +361,7 @@ const App = (() => {
     requestAnimationFrame(tick);
   }
 
-    async function procesarQR(datosQR) {
+  async function procesarQR(datosQR) {
     mostrarVista("view-loading");
     document.getElementById("loading-text").textContent = "Registrando evento...";
 
@@ -397,23 +396,21 @@ const App = (() => {
         payload.lotes = datos.lotes;
       }
 
-      // Enviar con JSONP para poder leer la respuesta
       const url = CONFIG.APPS_SCRIPT_URL
         + "?accion=evento"
         + "&data=" + encodeURIComponent(JSON.stringify(payload));
 
-      const respuesta = await jsonp(url);
+      const resp = await jsonp(url);
 
-      if (!respuesta.ok) {
-        if (respuesta.duplicado) {
-          // Mostrar aviso de duplicado
+      if (!resp.ok) {
+        if (resp.duplicado) {
           setTimeout(() => {
-            alert("⚠️ TARIMA YA REGISTRADA\n\n" + respuesta.mensaje + "\n\nRegistrada el: " + respuesta.fecha_anterior);
+            alert("⚠️ TARIMA YA REGISTRADA\n\n" + resp.mensaje + "\n\nRegistrada el: " + resp.fecha_anterior);
             mostrarVista("view-ready");
           }, 300);
           return;
         } else {
-          throw new Error(respuesta.error || "Error desconocido");
+          throw new Error(resp.error || "Error desconocido");
         }
       }
 
@@ -449,10 +446,6 @@ const App = (() => {
     document.getElementById("meta-po").textContent = datos.po || "-";
     mostrarVista("view-result");
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // ESTATUS DE CAMIONES (con JSONP)
-  // ═══════════════════════════════════════════════════════════
 
   function jsonp(url) {
     return new Promise((resolve, reject) => {
