@@ -633,7 +633,7 @@ const App = (() => {
     }
   }
 
-  function mostrarDetalleCamion(data) {
+    function mostrarDetalleCamion(data) {
     document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
 
     const contenedor = document.getElementById("detalle-camion");
@@ -654,10 +654,22 @@ const App = (() => {
       // Solo mostrar devolución si tiene registros
       if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
 
-      const status = e.completado ? "✅ COMPLETADO" : "⏳ FALTAN " + e.faltantes.length;
+      let status;
+      let clase;
+      if (e.completado) {
+        status = "✅ COMPLETADO";
+        clase = "completado";
+      } else if (e.registradas.length > 0) {
+        status = "⏳ FALTAN " + e.faltantes.length;
+        clase = "parcial";
+      } else {
+        status = "⏳ PENDIENTE";
+        clase = "pendiente";
+      }
 
-      html += '<div class="detalle-evento">';
-      html += '<h4>' + info.icono + ' ' + info.etiqueta + ' - ' + status + '</h4>';
+      html += '<div class="detalle-evento ' + clase + '">';
+      html += '<h4>' + info.icono + ' ' + info.etiqueta + '</h4>';
+      html += '<p class="detalle-status">' + status + '</p>';
       html += '<p class="detalle-numero">' + e.registradas.length + '/' + e.total + '</p>';
 
       if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
