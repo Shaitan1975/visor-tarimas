@@ -737,3 +737,34 @@ details summary {
   border-radius: 8px;
   border: 1px solid #FECACA;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   BOTÓN LIMPIAR PROGRESO
+   ═══════════════════════════════════════════════════════════ */
+
+.btn-limpiar-progreso {
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #C00000;
+  background: #FFF5F5;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+
+.btn-limpiar-progreso:hover {
+  background: #FEE2E2;
+}
+
+.btn-limpiar-progreso:active {
+  transform: scale(0.98);
+}
+
+.btn-limpiar-progreso.hidden {
+  display: none;
+}
