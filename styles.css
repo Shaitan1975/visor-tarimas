@@ -623,3 +623,117 @@ details summary {
   border-radius: 12px;
   font-style: italic;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PANEL DE PROGRESO PRINCIPAL (v18)
+   Contenedor, barra y números del avance en pantalla
+   ═══════════════════════════════════════════════════════════ */
+
+.progreso-camion {
+  background: #F9FAFB;
+  border: 2px solid var(--gris-borde);
+  border-radius: var(--radio);
+  padding: 16px;
+  margin: 20px 0;
+  text-align: left;
+  box-shadow: var(--sombra);
+}
+
+.progreso-camion.hidden {
+  display: none;
+}
+
+.progreso-loading {
+  text-align: center;
+  color: var(--gris-texto);
+  font-style: italic;
+  font-size: 13px;
+  padding: 10px;
+}
+
+.progreso-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.progreso-icono {
+  font-size: 22px;
+}
+
+.progreso-camion-nombre {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--azul-primario);
+}
+
+.progreso-evento {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gris-texto);
+  background: #E0E4EA;
+  padding: 3px 10px;
+  border-radius: 12px;
+  margin-left: auto;
+}
+
+.progreso-barra {
+  background: #E0E4EA;
+  height: 14px;
+  border-radius: 7px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progreso-barra-relleno {
+  background: linear-gradient(90deg, #22C55E, #16A34A);
+  height: 100%;
+  border-radius: 7px;
+  transition: width 0.6s ease;
+}
+
+.progreso-numeros {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.progreso-conteo {
+  font-weight: 700;
+  color: var(--azul-primario);
+  font-size: 15px;
+}
+
+.progreso-faltan {
+  color: var(--rojo-error);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.progreso-completo {
+  color: var(--verde-ok);
+  font-weight: 700;
+  font-size: 15px;
+  width: 100%;
+  text-align: center;
+  padding: 6px 0;
+  background: #F0FDF4;
+  border-radius: 8px;
+  border: 1px solid #BBF7D0;
+}
+
+.progreso-error {
+  color: var(--rojo-error);
+  text-align: center;
+  font-size: 13px;
+  padding: 10px;
+  background: #FEF2F2;
+  border-radius: 8px;
+  border: 1px solid #FECACA;
+}
