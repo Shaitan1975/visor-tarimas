@@ -55,6 +55,11 @@
 
       <button id="btn-cambiar-evento" class="btn-secondary hidden">🔄 Cambiar evento</button>
       <button id="btn-ver-estatus" class="btn-secondary">📊 Ver estatus de camiones</button>
+
+      <!-- Botón de Registro Manual (solo admin) -->
+      <button id="btn-registro-manual" class="btn-secondary" style="margin-top: 10px; background: #FFF7ED; color: #9A3412; border-color: #FED7AA;">
+        📝 Registro Manual (Admin)
+      </button>
     </div>
   </section>
 
@@ -159,6 +164,70 @@
     </div>
 
     <p id="send-status" class="send-status"></p>
+  </section>
+
+  <!-- Vista: REGISTRO MANUAL (ADMIN) -->
+  <section id="view-manual" class="view-section hidden">
+    <div class="manual-container">
+      <div class="estatus-header">
+        <h2>📝 Registro Manual</h2>
+        <button id="btn-cerrar-manual" class="btn-cerrar">✖</button>
+      </div>
+
+      <!-- Paso 1: Pedir clave admin -->
+      <div id="manual-paso-clave">
+        <p class="manual-descripcion">Ingresa la clave de administrador para continuar.</p>
+        <div class="input-group">
+          <label for="admin-clave">Clave Admin</label>
+          <input type="password" id="admin-clave" placeholder="••••••••" autocomplete="off">
+        </div>
+        <p id="manual-clave-error" class="error-msg"></p>
+        <button id="btn-validar-clave" class="btn-primary">Validar</button>
+      </div>
+
+      <!-- Paso 2: Formulario de registro -->
+      <div id="manual-paso-form" class="hidden">
+        <div class="input-group">
+          <label for="manual-camion">Camión</label>
+          <select id="manual-camion" class="manual-select">
+            <option value="">-- Selecciona un camión --</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="manual-evento">Evento</label>
+          <select id="manual-evento" class="manual-select">
+            <option value="">-- Selecciona un evento --</option>
+            <option value="SALIDA_PLANTA">🚚 Salida de Planta</option>
+            <option value="ADUANA_ENTRADA">🛃 Entrada a Aduana</option>
+            <option value="ADUANA_SALIDA">📦 Salida de Aduana</option>
+            <option value="ENTREGA_CEDIS">✅ Entrega en CEDIS</option>
+            <option value="DEVOLUCION">🔄 Devolución</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="manual-tarima">QR / Tarima</label>
+          <select id="manual-tarima" class="manual-select">
+            <option value="">-- Primero selecciona un camión --</option>
+          </select>
+        </div>
+
+        <div class="input-group">
+          <label for="manual-notas">Notas (opcional)</label>
+          <input type="text" id="manual-notas" placeholder="Ej: Registrado por llamada telefónica">
+        </div>
+
+        <p id="manual-registro-status" class="send-status"></p>
+
+        <button id="btn-registrar-manual" class="btn-primary btn-large">
+          ✅ Registrar Evento
+        </button>
+        <button id="btn-registrar-otro" class="btn-secondary hidden">
+          🔄 Registrar otro
+        </button>
+      </div>
+    </div>
   </section>
 
 </main>
