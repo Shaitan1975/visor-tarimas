@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v22)
-// Con progreso + alerta + registro manual solo para admins logueados
+// VISOR TARIMAS - LÓGICA DE LA PWA (v23)
+// Con progreso + alerta + registro manual admin + éxito inmediato
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -467,9 +467,11 @@ const App = (() => {
         setCamionActual(payload.camion);
       }
 
-      await actualizarProgresoPantalla();
+      // ⚡ MEJORA: Mostrar la pantalla de éxito de inmediato
+      setTimeout(() => mostrarExito(datos, session), 100);
 
-      setTimeout(() => mostrarExito(datos, session), 500);
+      // 🔄 Actualizar el progreso en segundo plano (no bloquea la UI)
+      actualizarProgresoPantalla();
 
     } catch (e) {
       setTimeout(() => {
