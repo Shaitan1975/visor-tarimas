@@ -430,10 +430,13 @@ const App = (() => {
         }
       }
 
-      // Guardar camión actual
+            // Guardar camión actual
       if (payload.camion) {
         setCamionActual(payload.camion);
       }
+
+      // ⬇️ AGREGA ESTA LÍNEA PARA ACTUALIZAR EL PROGRESO ⬇️
+      await actualizarProgresoPantalla();
 
       setTimeout(() => mostrarExito(datos, session), 500);
 
