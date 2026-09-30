@@ -1,657 +1,743 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - BACKEND v13
-// Con JSONP + validación de duplicados + verificación de tarima
-// Empresa: Mediese
+// VISOR TARIMAS - LÓGICA DE LA PWA (v19)
+// Con lista de tarimas en progreso + qr_id consistente con catálogo
 // ═══════════════════════════════════════════════════════════════════
 
-const DESTINATARIO = "sensabit@gmail.com";
-const CC_COMPLETADO = "sensabit@gmail.com";
-const SHEET_ID = "171i1B5MFv0N53xYs75IU2DG37iY1I2Wvtmmq234MmQY";
-const HOJA_CATALOGO = "CATALOGO_TARIMAS";
-const HOJA_EVENTOS = "EVENTOS";
-const HOJA_ESTADO = "ESTADO_ACTUAL";
+const CONFIG = {
+  APPS_SCRIPT_URL: `https://script.google.com/macros/s/AKfycbwtm5cTLUqyWaKXzlrYd4LBuYpWmFyqBSqCyNpsw2C9OvVJcuHVt223UQ3ck5NtRWI0jA/exec`,
+  CLAVE_EMPRESA: "MediesE2026$Almacen",
+  SALT_PBKDF2: "salt-fijo-empresa-2026",
+  ITERACIONES: 100000,
+  SESSION_KEY: "visor_tarimas_session",
+  CAMION_KEY: "visor_tarimas_camion_actual"
+};
 
-// ═══════════════════════════════════════════════════════════════════
-// NORMALIZACIÓN DE QR_ID (por si acaso hay ceros de diferencia)
-// ═══════════════════════════════════════════════════════════════════
+const EVENTOS = {
+  "SALIDA_PLANTA": { etiqueta: "🚚 SALIDA DE PLANTA", ubicacion: "PLANTA", color: "#1F4E79", icono: "🚚" },
+  "ADUANA_ENTRADA": { etiqueta: "🛃 ENTRADA A ADUANA", ubicacion: "ADUANA", color: "#B8860B", icono: "🛃" },
+  "ADUANA_SALIDA": { etiqueta: "📦 SALIDA DE ADUANA", ubicacion: "EN_TRANSITO", color: "#8B4513", icono: "📦" },
+  "ENTREGA_CEDIS": { etiqueta: "✅ ENTREGA EN CEDIS", ubicacion: "CEDIS", color: "#1F7A1F", icono: "✅" },
+  "DEVOLUCION": { etiqueta: "🔄 DEVOLUCIÓN", ubicacion: "DEVUELTO", color: "#C00000", icono: "🔄" },
+};
 
-function normalizarQR(qr) {
-  if (!qr) return "";
-  let s = qr.toString().trim().toUpperCase();
-  s = s.replace(/-T0+(\d+)/g, "-T$1");
-  return s;
-}
+const MAPA_LUGARES = {
+  "planta": "SALIDA_PLANTA",
+  "aduana-entrada": "ADUANA_ENTRADA",
+  "aduana-salida": "ADUANA_SALIDA",
+  "cedis": "ENTREGA_CEDIS",
+  "devolucion": "DEVOLUCION",
+};
 
-// ═══════════════════════════════════════════════════════════════════
-// ENDPOINT POST
-// ═══════════════════════════════════════════════════════════════════
+const App = (() => {
 
-function doPost(e) {
-  try {
-    let body = null;
+  let modoActual = null;
+  let modoSeleccionado = null;
+  let datosActuales = null;
 
-    if (e.postData && e.postData.contents) {
-      const contents = e.postData.contents;
-      try {
-        body = JSON.parse(contents);
-      } catch (err1) {
-        const match = contents.match(/^data=([\s\S]+)$/);
-        if (match) {
-          try {
-            body = JSON.parse(decodeURIComponent(match[1]));
-          } catch (err2) {
-            try {
-              body = JSON.parse(match[1]);
-            } catch (err3) {
-              body = null;
-            }
-          }
+  function getSession() {
+    const s = localStorage.getItem(CONFIG.SESSION_KEY);
+    return s ? JSON.parse(s) : null;
+  }
+  function setSession(d) {
+    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(d));
+  }
+  function clearSession() {
+    localStorage.removeItem(CONFIG.SESSION_KEY);
+  }
+
+  function getCamionActual() {
+    return localStorage.getItem(CONFIG.CAMION_KEY) || null;
+  }
+  function setCamionActual(camion) {
+    if (camion) {
+      localStorage.setItem(CONFIG.CAMION_KEY, camion);
+    }
+  }
+  function limpiarCamionActual() {
+    localStorage.removeItem(CONFIG.CAMION_KEY);
+  }
+
+  async function pbkdf2Hash(password, saltHex) {
+    const enc = new TextEncoder();
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveBits"]
+    );
+    const saltBytes = new Uint8Array(
+      saltHex.match(/.{1,2}/g).map(b => parseInt(b, 16))
+    );
+    const bits = await crypto.subtle.deriveBits(
+      { name: "PBKDF2", salt: saltBytes, iterations: CONFIG.ITERACIONES, hash: "SHA-256" },
+      keyMaterial, 256
+    );
+    return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function verificarUsuario(usuario, password) {
+    try {
+      const resp = await fetch("usuarios.json?t=" + Date.now());
+      const usuarios = await resp.json();
+      const user = usuarios.find(u => u.user === usuario.toLowerCase().trim());
+      if (!user) return null;
+      const hashCalc = await pbkdf2Hash(password, user.salt);
+      if (hashCalc === user.hash) {
+        return {
+          user: user.user, nombre: user.nombre, rol: user.rol,
+          ubicacion: user.ubicacion || "planta",
+          eventos_permitidos: user.eventos_permitidos || ["SALIDA_PLANTA"],
+        };
+      }
+      return null;
+    } catch (e) {
+      console.error("Error al verificar usuario:", e);
+      return null;
+    }
+  }
+
+  function descifrarBlobQR(blobB64, password) {
+    const key = CryptoJS.PBKDF2(password, CONFIG.SALT_PBKDF2, {
+      keySize: 256 / 32, iterations: CONFIG.ITERACIONES, hasher: CryptoJS.algo.SHA256
+    });
+    let normalized = blobB64.replace(/-/g, "+").replace(/_/g, "/");
+    while (normalized.length % 4 !== 0) normalized += "=";
+    const combined = CryptoJS.enc.Base64.parse(normalized);
+    const combinedHex = combined.toString(CryptoJS.enc.Hex);
+    const ivHex = combinedHex.substring(0, 32);
+    const ciphertextHex = combinedHex.substring(32);
+    const iv = CryptoJS.enc.Hex.parse(ivHex);
+    const ciphertext = CryptoJS.enc.Hex.parse(ciphertextHex);
+    const decrypted = CryptoJS.AES.decrypt(
+      { ciphertext: ciphertext }, key,
+      { iv: iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+    );
+    const texto = decrypted.toString(CryptoJS.enc.Utf8);
+    if (!texto) throw new Error("Contraseña incorrecta o datos corruptos");
+    return JSON.parse(texto);
+  }
+
+  function parsearQRPT(texto) {
+    const partes = {};
+    texto.split("|").forEach(p => {
+      const idx = p.indexOf(":");
+      if (idx > 0) {
+        partes[p.substring(0, idx).trim()] = p.substring(idx + 1).trim();
+      }
+    });
+    let lotes = [];
+    if (partes.LOTES) {
+      partes.LOTES.split(",").forEach(l => {
+        const idx = l.indexOf(":");
+        if (idx > 0) {
+          lotes.push({
+            lote: l.substring(0, idx).trim(),
+            pz: parseInt(l.substring(idx + 1).trim()) || 0
+          });
         }
-      }
+      });
     }
+    const dc = partes.DC || "";
+    const tarima = partes.TARIMA || "";
+    return {
+      o: dc, l: tarima,
+      po: partes.PO || "",
+      cedis: partes.CEDIS || "",
+      dc: dc,
+      s: partes.S || "",
+      c: partes.CAM || "",
+      camion: partes.CAM || "",
+      num_tarima: tarima,
+      t: tarima,
+      tot: partes.TOT || "",
+      lotes: lotes,
+      es_pt: true,
+    };
+  }
 
-    if (!body && e.parameter && e.parameter.data) {
-      try {
-        body = JSON.parse(e.parameter.data);
-      } catch (err4) {
-        body = null;
-      }
+  function initLogin() {
+    if (getSession()) {
+      window.location.href = "scanner.html";
+      return;
     }
+    const form = document.getElementById("login-form");
+    const errorMsg = document.getElementById("error-msg");
+    const btn = form.querySelector("button");
 
-    if (!body) {
-      return respuesta({ ok: false, error: "No se pudo parsear el body" });
-    }
-
-    const accion = body.accion || "evento";
-
-    if (accion === "registrar_tarima") {
-      return registrarTarimaEnCatalogo(body);
-    } else if (accion === "evento") {
-      return registrarEvento(body);
-    } else {
-      return respuesta({ ok: false, error: "Acción desconocida: " + accion });
-    }
-  } catch (error) {
-    console.error("Error:", error);
-    return respuesta({ ok: false, error: error.toString() });
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// ENDPOINT GET (con soporte JSONP)
-// ═══════════════════════════════════════════════════════════════════
-
-function doGet(e) {
-  const accion = e.parameter ? e.parameter.accion : null;
-  const callback = e.parameter ? e.parameter.callback : null;
-
-  let resultado = null;
-
-  if (accion === "estatus_camiones") {
-    resultado = obtenerEstatusCamionesData();
-  } else if (accion === "estatus_camion") {
-    resultado = obtenerEstatusCamionData(e.parameter.camion);
-  } else if (accion === "verificar_tarima") {
-    resultado = verificarTarimaExiste(e.parameter.qr_id);
-  } else if (accion === "evento") {
-    let body = {};
-    try {
-      if (e.parameter.data) {
-        body = JSON.parse(e.parameter.data);
-      }
-    } catch (err) {
-      resultado = { ok: false, error: "Body inválido" };
-    }
-    if (!resultado) {
-      resultado = registrarEventoData(body);
-    }
-  } else {
-    resultado = { ok: true, mensaje: "Visor Tarimas activo" };
-  }
-
-  const jsonStr = JSON.stringify(resultado);
-
-  if (callback) {
-    return ContentService
-      .createTextOutput(callback + "(" + jsonStr + ");")
-      .setMimeType(ContentService.MimeType.JAVASCRIPT);
-  }
-
-  return ContentService
-    .createTextOutput(jsonStr)
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-function respuesta(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// VERIFICAR SI UNA TARIMA YA EXISTE EN EL CATÁLOGO
-// ═══════════════════════════════════════════════════════════════════
-
-function verificarTarimaExiste(qrId) {
-  if (!qrId) return { ok: false, existe: false, error: "Falta qr_id" };
-
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const hoja = ss.getSheetByName(HOJA_CATALOGO);
-  const datos = hoja.getDataRange().getValues();
-
-  for (let i = 1; i < datos.length; i++) {
-    if (datos[i][0] === qrId) {
-      return { ok: true, existe: true, qr_id: qrId };
-    }
-  }
-
-  return { ok: true, existe: false, qr_id: qrId };
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// REGISTRAR EVENTO VIA JSONP (con validación de duplicados)
-// ═══════════════════════════════════════════════════════════════════
-
-function registrarEventoData(body) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const hoja = ss.getSheetByName(HOJA_EVENTOS);
-
-  const ahora = new Date();
-  const fecha = Utilities.formatDate(ahora, "America/Mexico_City", "dd/MM/yyyy");
-  const hora = Utilities.formatDate(ahora, "America/Mexico_City", "HH:mm:ss");
-  const timestamp = ahora.toISOString();
-  const ubicacion = obtenerUbicacion(body.evento);
-
-  const qrId = body.qr_id || "";
-  const camion = body.camion || "";
-  const evento = body.evento || "";
-
-  if (qrId && camion && evento) {
-    const datosEventos = hoja.getDataRange().getValues();
-    const qrNorm = normalizarQR(qrId);
-    let yaRegistrado = false;
-    let fechaRegistroAnterior = "";
-
-    for (let i = 1; i < datosEventos.length; i++) {
-      if (normalizarQR(datosEventos[i][1]) === qrNorm && datosEventos[i][5] === evento) {
-        yaRegistrado = true;
-        fechaRegistroAnterior = datosEventos[i][2] + " " + datosEventos[i][3];
-        break;
-      }
-    }
-
-    if (yaRegistrado) {
-      return {
-        ok: false,
-        duplicado: true,
-        error: "Esta tarima ya fue registrada",
-        mensaje: "La tarima " + qrId + " ya tiene registrado el evento " + evento,
-        fecha_anterior: fechaRegistroAnterior,
-      };
-    }
-  }
-
-  const idEvento = "EVT-" + ahora.getTime();
-
-  let lotes = body.lotes || [];
-  if (typeof lotes === "string") {
-    try {
-      lotes = JSON.parse(lotes);
-    } catch (e) {
-      lotes = [];
-    }
-  }
-  if (!Array.isArray(lotes)) {
-    lotes = [];
-  }
-  lotes = lotes.filter(l => l && typeof l === "object" && (l.lote || l.l));
-
-  if (lotes.length > 0) {
-    lotes.forEach(lote => {
-      hoja.appendRow([
-        idEvento, qrId, fecha, hora, timestamp, evento, ubicacion,
-        camion, body.po || "", body.cedis || "", body.dc || "",
-        body.sabor || "", body.num_tarima || "",
-        lote.lote || lote.l || "", lote.pz || 0,
-        body.usuario || "", body.nombre || "", body.rol || "", body.notas || "",
-      ]);
-    });
-  } else {
-    hoja.appendRow([
-      idEvento, qrId, fecha, hora, timestamp, evento, ubicacion,
-      camion, body.po || "", body.cedis || "", body.dc || "",
-      body.sabor || "", body.num_tarima || "",
-      "", "",
-      body.usuario || "", body.nombre || "", body.rol || "", body.notas || "",
-    ]);
-  }
-
-  actualizarEstadoActual(qrId);
-
-  const estatus = calcularEstatusEvento(camion, evento);
-
-  if (estatus.completado) {
-    if (evento === "DEVOLUCION") {
-      enviarCorreoDevolucion(camion, estatus);
-    } else {
-      enviarCorreoCompletado(camion, evento, estatus);
-    }
-  }
-
-  return {
-    ok: true,
-    mensaje: "Evento registrado: " + evento,
-    ubicacion: ubicacion,
-    fecha: fecha,
-    hora: hora,
-    filas: lotes.length > 0 ? lotes.length : 1,
-    estatus: estatus,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// REGISTRAR EVENTO (POST normal)
-// ═══════════════════════════════════════════════════════════════════
-
-function registrarEvento(body) {
-  const result = registrarEventoData(body);
-  return respuesta(result);
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// REGISTRAR TARIMA EN CATÁLOGO
-// ═══════════════════════════════════════════════════════════════════
-
-function registrarTarimaEnCatalogo(body) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const hoja = ss.getSheetByName(HOJA_CATALOGO);
-
-  let lotes = body.lotes || [];
-  if (typeof lotes === "string") {
-    try {
-      lotes = JSON.parse(lotes);
-    } catch (e) {
-      lotes = [];
-    }
-  }
-  if (!Array.isArray(lotes)) {
-    lotes = [];
-  }
-  lotes = lotes.filter(l => l && typeof l === "object" && (l.lote || l.l));
-
-  const esPT = lotes.length > 0;
-
-  if (esPT) {
-    const fecha = body.fecha_gen || new Date().toLocaleDateString("es-MX");
-    const hora = body.hora_gen || new Date().toLocaleTimeString("es-MX");
-
-    lotes.forEach(lote => {
-      const fila = [
-        body.qr_id || "",
-        fecha,
-        hora,
-        body.camion || "",
-        body.año || new Date().getFullYear(),
-        body.po || "",
-        body.cedis || "",
-        body.dc || "",
-        body.sabor || "",
-        body.sku || "",
-        body.upc || "",
-        body.num_tarima || 0,
-        body.total_tarimas || 0,
-        lote.lote || lote.l || "",
-        lote.pz || 0,
-        body.piezas_total || 0,
-        body.unidad || "PZ",
-        "PT",
-      ];
-      hoja.appendRow(fila);
-    });
-
-    return respuesta({
-      ok: true,
-      mensaje: "Tarima PT registrada: " + lotes.length + " filas",
-    });
-  } else {
-    const fila = [
-      body.qr_id || "",
-      body.fecha_gen || new Date().toLocaleDateString("es-MX"),
-      body.hora_gen || new Date().toLocaleTimeString("es-MX"),
-      body.camion || "",
-      body.año || new Date().getFullYear(),
-      body.po || "",
-      body.cedis || "",
-      body.dc || "",
-      body.sabor || "",
-      body.sku || "",
-      body.upc || "",
-      body.num_tarima || 0,
-      body.total_tarimas || 0,
-      "",
-      "",
-      body.piezas_total || body.cantidad || 0,
-      body.unidad || "PZ",
-      "PT",
-    ];
-    hoja.appendRow(fila);
-    return respuesta({ ok: true, mensaje: "Tarima registrada" });
-  }
-}
-
-function obtenerUbicacion(evento) {
-  const mapa = {
-    "SALIDA_PLANTA": "PLANTA",
-    "ADUANA_ENTRADA": "ADUANA",
-    "ADUANA_SALIDA": "EN_TRANSITO",
-    "ENTREGA_CEDIS": "CEDIS",
-    "DEVOLUCION": "DEVUELTO",
-    "REUBICACION": "ALMACEN",
-  };
-  return mapa[evento] || "DESCONOCIDO";
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// ESTATUS DE CAMIONES
-// ═══════════════════════════════════════════════════════════════════
-
-function obtenerEstatusCamionesData() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const hojaCatalogo = ss.getSheetByName(HOJA_CATALOGO);
-  const hojaEventos = ss.getSheetByName(HOJA_EVENTOS);
-
-  const datosCatalogo = hojaCatalogo.getDataRange().getValues();
-  const tarimasPorCamion = {};
-
-  for (let i = 1; i < datosCatalogo.length; i++) {
-    const qrId = datosCatalogo[i][0];
-    const camion = datosCatalogo[i][3];
-    if (!qrId || !camion) continue;
-    if (!tarimasPorCamion[camion]) tarimasPorCamion[camion] = new Set();
-    tarimasPorCamion[camion].add(normalizarQR(qrId));
-  }
-
-  const datosEventos = hojaEventos.getDataRange().getValues();
-  const eventosPorCamion = {};
-
-  for (let i = 1; i < datosEventos.length; i++) {
-    const qrId = datosEventos[i][1];
-    const camion = datosEventos[i][7];
-    const evento = datosEventos[i][5];
-    if (!qrId || !camion || !evento) continue;
-    if (!eventosPorCamion[camion]) eventosPorCamion[camion] = {};
-    if (!eventosPorCamion[camion][evento]) eventosPorCamion[camion][evento] = new Set();
-    eventosPorCamion[camion][evento].add(normalizarQR(qrId));
-  }
-
-  const EVENTOS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
-  const camiones = [];
-
-  for (const camion in tarimasPorCamion) {
-    const totalTarimas = tarimasPorCamion[camion].size;
-    const eventos = {};
-    let activo = false;
-
-    EVENTOS.forEach(ev => {
-      const registradas = eventosPorCamion[camion] && eventosPorCamion[camion][ev]
-        ? eventosPorCamion[camion][ev].size : 0;
-      const completado = registradas >= totalTarimas;
-      const faltan = Math.max(0, totalTarimas - registradas);
-
-      if (ev === "DEVOLUCION") {
-        if (registradas > 0 && !completado) activo = true;
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorMsg.textContent = "";
+      btn.disabled = true;
+      btn.textContent = "Verificando...";
+      const usuario = document.getElementById("usuario").value;
+      const password = document.getElementById("password").value;
+      const user = await verificarUsuario(usuario, password);
+      if (user) {
+        setSession(user);
+        window.location.href = "scanner.html";
       } else {
-        if (!completado) activo = true;
+        errorMsg.textContent = "Usuario o contraseña incorrectos";
+        btn.disabled = false;
+        btn.textContent = "Entrar";
       }
-
-      eventos[ev] = {
-        registradas: registradas,
-        total: totalTarimas,
-        completado: completado,
-        faltan: faltan,
-      };
-    });
-
-    camiones.push({
-      camion: camion,
-      total_tarimas: totalTarimas,
-      eventos: eventos,
-      activo: activo,
     });
   }
 
-  camiones.sort((a, b) => {
-    if (a.activo !== b.activo) return a.activo ? -1 : 1;
-    return b.camion.localeCompare(a.camion);
-  });
+  let stream = null;
+  let scanning = false;
 
-  return { ok: true, camiones: camiones };
-}
+  function initScanner() {
+    const session = getSession();
+    if (!session) {
+      window.location.href = "index.html";
+      return;
+    }
 
-// ═══════════════════════════════════════════════════════════════════
-// ESTATUS DE UN CAMIÓN ESPECÍFICO
-// ═══════════════════════════════════════════════════════════════════
+    document.getElementById("user-info").textContent = `${session.nombre} (${session.rol})`;
 
-function obtenerEstatusCamionData(camion) {
-  if (!camion) return { ok: false, error: "Falta camion" };
+    document.getElementById("btn-logout").addEventListener("click", () => {
+      clearSession();
+      window.location.href = "index.html";
+    });
 
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const hojaCatalogo = ss.getSheetByName(HOJA_CATALOGO);
-  const hojaEventos = ss.getSheetByName(HOJA_EVENTOS);
+    const btnCambiar = document.getElementById("btn-cambiar-evento");
+    if (btnCambiar) {
+      btnCambiar.addEventListener("click", () => {
+        modoSeleccionado = null;
+        iniciarFlujo(session);
+      });
+    }
 
-  // ── 1. Obtener tarimas del catálogo para este camión ──
-  const datosCatalogo = hojaCatalogo.getDataRange().getValues();
-  const tarimas = new Set();
-  let po = "";
+    document.getElementById("btn-start-scan").addEventListener("click", iniciarCamara);
+    document.getElementById("btn-cancel-scan").addEventListener("click", cancelarCamara);
+    document.getElementById("btn-scan-again").addEventListener("click", () => {
+      document.getElementById("send-status").textContent = "";
+      mostrarVista("view-ready");
+    });
 
-  for (let i = 1; i < datosCatalogo.length; i++) {
-    if (datosCatalogo[i][3] === camion) {
-      tarimas.add(datosCatalogo[i][0]);
-      if (!po) po = datosCatalogo[i][5];
+    document.getElementById("btn-ver-estatus").addEventListener("click", verEstatusCamiones);
+    document.getElementById("btn-cerrar-estatus").addEventListener("click", () => mostrarVista("view-ready"));
+    document.getElementById("btn-cerrar-detalle").addEventListener("click", verEstatusCamiones);
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("sw.js").then(reg => {
+        reg.update().catch(() => {});
+      }).catch(() => {});
+    }
+
+    window.addEventListener("focus", () => {
+      const estatusVisible = !document.getElementById("view-estatus").classList.contains("hidden");
+      if (estatusVisible) {
+        verEstatusCamiones();
+      }
+    });
+
+    iniciarFlujo(session);
+  }
+
+  function iniciarFlujo(session) {
+    const params = new URLSearchParams(window.location.search);
+    const lugarParam = params.get("lugar");
+    if (lugarParam && MAPA_LUGARES[lugarParam]) {
+      modoSeleccionado = MAPA_LUGARES[lugarParam];
+      aplicarModo(EVENTOS[modoSeleccionado]);
+      mostrarVista("view-ready");
+      return;
+    }
+
+    const eventos = session.eventos_permitidos || ["SALIDA_PLANTA"];
+    if (eventos.length === 0) {
+      alert("Tu usuario no tiene eventos asignados. Contacta al administrador.");
+      clearSession();
+      window.location.href = "index.html";
+      return;
+    }
+    if (eventos.length === 1) {
+      modoSeleccionado = eventos[0];
+      aplicarModo(EVENTOS[modoSeleccionado]);
+      mostrarVista("view-ready");
+      return;
+    }
+    mostrarSelector(eventos);
+  }
+
+  function mostrarSelector(eventos) {
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion"]
+      .forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.classList.add("hidden");
+      });
+
+    const banner = document.getElementById("modo-indicador");
+    if (banner) banner.style.display = "none";
+
+    const contenedor = document.getElementById("lista-eventos");
+    contenedor.innerHTML = "";
+
+    eventos.forEach(ev => {
+      const info = EVENTOS[ev];
+      if (!info) return;
+      const btn = document.createElement("button");
+      btn.className = "btn-evento";
+      btn.style.background = info.color;
+      btn.innerHTML = `${info.icono}<br/><span>${info.etiqueta}</span>`;
+      btn.addEventListener("click", () => {
+        modoSeleccionado = ev;
+        aplicarModo(info);
+        mostrarVista("view-ready");
+      });
+      contenedor.appendChild(btn);
+    });
+
+    document.getElementById("view-selector").classList.remove("hidden");
+  }
+
+  function aplicarModo(info) {
+    const banner = document.getElementById("modo-indicador");
+    const texto = document.getElementById("modo-texto");
+    const icono = document.getElementById("modo-icono");
+
+    if (banner) banner.style.display = "flex";
+    if (texto) texto.textContent = info.etiqueta;
+    if (icono) icono.textContent = info.icono;
+    if (banner) banner.style.background = info.color;
+
+    const btnCambiar = document.getElementById("btn-cambiar-evento");
+    if (btnCambiar) {
+      const session = getSession();
+      if (session && session.eventos_permitidos && session.eventos_permitidos.length > 1) {
+        btnCambiar.classList.remove("hidden");
+      } else {
+        btnCambiar.classList.add("hidden");
+      }
+    }
+
+    const readyTitulo = document.getElementById("ready-titulo");
+    const readyDesc = document.getElementById("ready-descripcion");
+    if (readyTitulo) readyTitulo.textContent = info.etiqueta;
+    if (readyDesc) readyDesc.textContent = "Escanea cada tarima para registrar el evento.";
+  }
+
+  function mostrarVista(id) {
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion"]
+      .forEach(v => {
+        const el = document.getElementById(v);
+        if (el) el.classList.add("hidden");
+      });
+    document.getElementById(id).classList.remove("hidden");
+
+    if (id === "view-ready") {
+      actualizarProgresoPantalla();
     }
   }
 
-  // ── 2. Obtener eventos registrados para este camión ──
-  const datosEventos = hojaEventos.getDataRange().getValues();
-  const eventosDetalle = {};
-  const EVENTOS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
+  async function iniciarCamara() {
+    mostrarVista("view-scanning");
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const video = document.getElementById("qr-video");
+      video.srcObject = stream;
+      video.setAttribute("playsinline", true);
+      await video.play();
+      scanning = true;
+      requestAnimationFrame(tick);
+    } catch (e) {
+      alert("No se pudo acceder a la cámara:\n" + e.message);
+      mostrarVista("view-ready");
+    }
+  }
 
-  EVENTOS.forEach(ev => {
-    eventosDetalle[ev] = { registradas: [], faltantes: [] };
-  });
+  function cancelarCamara() {
+    scanning = false;
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+    mostrarVista("view-ready");
+  }
 
-  for (let i = 1; i < datosEventos.length; i++) {
-    if (datosEventos[i][7] === camion) {
-      const qrId = datosEventos[i][1];
-      const evento = datosEventos[i][5];
-      if (eventosDetalle[evento]) {
-        const qrNorm = normalizarQR(qrId);
-        const yaExiste = eventosDetalle[evento].registradas.some(
-          q => normalizarQR(q) === qrNorm
-        );
-        if (!yaExiste) {
-          eventosDetalle[evento].registradas.push(qrId);
+  function tick() {
+    if (!scanning) return;
+    const video = document.getElementById("qr-video");
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      const canvas = document.createElement("canvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(video, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height);
+      if (code && code.data) {
+        scanning = false;
+        if (stream) {
+          stream.getTracks().forEach(t => t.stop());
+          stream = null;
+        }
+        procesarQR(code.data);
+        return;
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  async function procesarQR(datosQR) {
+    mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Registrando evento...";
+
+    try {
+      let datos = null;
+      if (datosQR.includes("PO:") && datosQR.includes("|")) {
+        datos = parsearQRPT(datosQR);
+      } else {
+        datos = descifrarBlobQR(datosQR, CONFIG.CLAVE_EMPRESA);
+      }
+
+      datosActuales = datos;
+      const session = getSession();
+
+      // ⬇️ AQUÍ EL CAMBIO CLAVE: qr_id usa el formato T01 (con cero) para que coincida con el catálogo
+      const numTarimaStr = String(datos.num_tarima || "").padStart(2, "0");
+
+      const payload = {
+        accion: "evento",
+        qr_id: (datos.camion || "") + "-DC" + (datos.dc || "") + "-" + (datos.s || "") + "-T" + numTarimaStr,
+        camion: datos.c || datos.camion || "",
+        po: datos.po || "",
+        cedis: datos.cedis || "",
+        dc: datos.dc || datos.g || datos.o || "",
+        sabor: datos.s || datos.sabor || "",
+        num_tarima: datos.num_tarima || datos.t || 0,
+        evento: modoSeleccionado,
+        usuario: session.user,
+        nombre: session.nombre,
+        rol: session.rol,
+        notas: "",
+      };
+
+      if (datos.lotes && datos.lotes.length > 0) {
+        payload.lotes = datos.lotes;
+      }
+
+      const url = CONFIG.APPS_SCRIPT_URL
+        + "?accion=evento"
+        + "&data=" + encodeURIComponent(JSON.stringify(payload));
+
+      const resp = await jsonp(url);
+
+      if (!resp.ok) {
+        if (resp.duplicado) {
+          setTimeout(() => {
+            alert("⚠️ TARIMA YA REGISTRADA\n\n" + resp.mensaje + "\n\nRegistrada el: " + resp.fecha_anterior);
+            mostrarVista("view-ready");
+          }, 300);
+          return;
+        } else {
+          throw new Error(resp.error || "Error desconocido");
         }
       }
+
+      if (payload.camion) {
+        setCamionActual(payload.camion);
+      }
+
+      await actualizarProgresoPantalla();
+
+      setTimeout(() => mostrarExito(datos, session), 500);
+
+    } catch (e) {
+      setTimeout(() => {
+        alert("Error al procesar el QR:\n\n" + e.message);
+        mostrarVista("view-ready");
+      }, 300);
     }
   }
 
-  // ── 3. Calcular faltantes para cada evento ──
-  const tarimasArray = Array.from(tarimas);
+  function mostrarExito(datos, session) {
+    const ahora = new Date();
+    const fecha = ahora.toLocaleDateString("es-MX");
+    const hora = ahora.toLocaleTimeString("es-MX");
+    const info = EVENTOS[modoSeleccionado];
 
-  EVENTOS.forEach(ev => {
-    const registradasNorm = eventosDetalle[ev].registradas.map(normalizarQR);
-    eventosDetalle[ev].faltantes = tarimasArray.filter(t => {
-      return !registradasNorm.includes(normalizarQR(t));
+    document.getElementById("result-titulo").textContent = "OK: " + info.etiqueta;
+    document.getElementById("result-subtitulo").textContent = (datos.dc ? "DC " + datos.dc : "") + " " + (datos.s || "");
+    document.getElementById("meta-evento").textContent = modoSeleccionado;
+    document.getElementById("meta-ubicacion").textContent = info.ubicacion;
+    document.getElementById("meta-fecha").textContent = fecha + " " + hora;
+    document.getElementById("meta-camion").textContent = datos.c || datos.camion || "-";
+    document.getElementById("meta-dc").textContent = datos.dc || "-";
+    document.getElementById("meta-sabor").textContent = datos.s || "-";
+    document.getElementById("meta-lote").textContent =
+      (datos.lotes && datos.lotes.length > 0)
+        ? datos.lotes.map(l => l.lote + " (" + l.pz + " PZ)").join(", ")
+        : (datos.lote || datos.l || "-");
+    document.getElementById("meta-tarima").textContent = datos.num_tarima || datos.t || "-";
+    document.getElementById("meta-po").textContent = datos.po || "-";
+    mostrarVista("view-result");
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // PROGRESO EN PANTALLA PRINCIPAL
+  // ═══════════════════════════════════════════════════════════
+
+  async function actualizarProgresoPantalla() {
+    const camion = getCamionActual();
+    const contenedor = document.getElementById("progreso-camion");
+
+    if (!contenedor) return;
+
+    if (!camion) {
+      contenedor.innerHTML = "";
+      contenedor.classList.add("hidden");
+      return;
+    }
+
+    contenedor.classList.remove("hidden");
+    contenedor.innerHTML = '<div class="progreso-loading">⏳ Cargando progreso...</div>';
+
+    try {
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
+
+      if (!data.ok) throw new Error("Error");
+
+      const eventoActual = modoSeleccionado || "SALIDA_PLANTA";
+      const info = EVENTOS[eventoActual];
+      const ev = data.eventos[eventoActual];
+
+      if (!ev) throw new Error("Evento no encontrado");
+
+      const pct = ev.total > 0 ? Math.round((ev.registradas.length / ev.total) * 100) : 0;
+      const completado = ev.completado;
+
+      let html = '<div class="progreso-titulo">';
+      html += '<span class="progreso-icono">🚚</span>';
+      html += '<span class="progreso-camion-nombre">' + camion + '</span>';
+      html += '<span class="progreso-evento">' + info.icono + ' ' + info.etiqueta + '</span>';
+      html += '</div>';
+
+      html += '<div class="progreso-barra">';
+      html += '<div class="progreso-barra-relleno" style="width: ' + pct + '%;"></div>';
+      html += '</div>';
+
+      html += '<div class="progreso-numeros">';
+      if (completado) {
+        html += '<span class="progreso-completo">✅ COMPLETADO ' + ev.registradas.length + '/' + ev.total + '</span>';
+      } else {
+        html += '<span class="progreso-conteo">📊 ' + ev.registradas.length + '/' + ev.total + '</span>';
+        html += '<span class="progreso-faltan">⏳ Faltan ' + ev.faltantes.length + '</span>';
+      }
+      html += '</div>';
+
+      // Lista de tarimas registradas (todas)
+      if (ev.registradas.length > 0) {
+        html += '<div class="progreso-lista-titulo">';
+        html += '<span>✅ Registradas (' + ev.registradas.length + '):</span>';
+        html += '</div>';
+        html += '<div class="progreso-lista">';
+        ev.registradas.slice().reverse().forEach(qr => {
+          html += '<span class="chip-registrada">✅ ' + qr + '</span>';
+        });
+        html += '</div>';
+      }
+
+      // Lista de faltantes (hasta 28 visibles)
+      const MAX_FALTANTES = 28;
+      if (ev.faltantes.length > 0 && !completado) {
+        html += '<div class="progreso-lista-titulo">';
+        html += '<span>⏳ Faltantes (' + ev.faltantes.length + '):</span>';
+        html += '</div>';
+        html += '<div class="progreso-lista progreso-lista-faltantes">';
+        ev.faltantes.slice(0, MAX_FALTANTES).forEach(qr => {
+          html += '<span class="chip-faltante">⏳ ' + qr + '</span>';
+        });
+        if (ev.faltantes.length > MAX_FALTANTES) {
+          html += '<span class="chip-mas">+ ' + (ev.faltantes.length - MAX_FALTANTES) + ' más...</span>';
+        }
+        html += '</div>';
+      }
+
+      contenedor.innerHTML = html;
+
+    } catch (e) {
+      contenedor.innerHTML = '<div class="progreso-error">⚠️ Error al cargar progreso</div>';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // JSONP
+  // ═══════════════════════════════════════════════════════════
+
+  function jsonp(url) {
+    return new Promise((resolve, reject) => {
+      const callbackName = "jsonp_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+      window[callbackName] = (data) => {
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        resolve(data);
+      };
+      const script = document.createElement("script");
+      script.src = url + "&callback=" + callbackName;
+      script.onerror = () => {
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        reject(new Error("Error de red"));
+      };
+      document.body.appendChild(script);
+      setTimeout(() => {
+        if (window[callbackName]) {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
+          reject(new Error("Timeout"));
+        }
+      }, 15000);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ESTATUS DE CAMIONES
+  // ═══════════════════════════════════════════════════════════
+
+  async function verEstatusCamiones() {
+    mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Cargando estatus...";
+    try {
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camiones");
+      if (!data.ok) throw new Error("Error al cargar estatus");
+      mostrarListaCamiones(data.camiones);
+    } catch (e) {
+      alert("Error al cargar estatus:\n\n" + e.message);
+      mostrarVista("view-ready");
+    }
+  }
+
+  function mostrarListaCamiones(camiones) {
+    const contenedor = document.getElementById("lista-camiones");
+    contenedor.innerHTML = "";
+
+    const activos = camiones.filter(c => c.activo);
+    const completados = camiones.filter(c => !c.activo);
+
+    if (activos.length === 0 && completados.length === 0) {
+      contenedor.innerHTML = '<p style="text-align:center;padding:20px;">No hay camiones registrados.</p>';
+      mostrarVista("view-estatus");
+      return;
+    }
+
+    if (activos.length > 0) {
+      const titulo = document.createElement("h3");
+      titulo.textContent = "🔥 Camiones Activos";
+      titulo.style.marginTop = "10px";
+      contenedor.appendChild(titulo);
+      activos.forEach(c => contenedor.appendChild(crearTarjetaCamion(c)));
+    }
+
+    if (completados.length > 0) {
+      const titulo = document.createElement("h3");
+      titulo.textContent = "✅ Camiones Completados";
+      titulo.style.marginTop = "20px";
+      contenedor.appendChild(titulo);
+      completados.slice(0, 10).forEach(c => contenedor.appendChild(crearTarjetaCamion(c)));
+    }
+
+    mostrarVista("view-estatus");
+  }
+
+  function crearTarjetaCamion(camion) {
+    const card = document.createElement("div");
+    card.className = "camion-card";
+    if (camion.activo) card.classList.add("activo");
+
+    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
+
+    let html = '<div class="camion-titulo">🚚 ' + camion.camion + ' <span class="camion-total">(' + camion.total_tarimas + ' tarimas)</span></div>';
+    html += '<div class="eventos-lista">';
+
+    EVS.forEach(ev => {
+      const info = EVENTOS[ev];
+      const e = camion.eventos[ev];
+      if (!info || !e) return;
+      if (ev === "DEVOLUCION" && e.registradas === 0) return;
+
+      const cls = e.completado ? "completado" : "pendiente";
+      let faltanTexto = "";
+      if (!e.completado) {
+        faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
+      }
+
+      html += '<div class="evento-linea ' + cls + '">' +
+              '<span class="evento-icono">' + info.icono + '</span>' +
+              '<span class="evento-nombre">' + info.etiqueta + ' ' + faltanTexto + '</span>' +
+              '<span class="evento-progreso">' + e.registradas + '/' + e.total + '</span>' +
+              '<span class="evento-check">' + (e.completado ? '✅' : '⏳') + '</span>' +
+              '</div>';
     });
 
-    eventosDetalle[ev].total = tarimasArray.length;
-    eventosDetalle[ev].completado =
-      eventosDetalle[ev].faltantes.length === 0 && tarimasArray.length > 0;
-  });
-
-  // ── 4. Devolver resultado ──
-  return {
-    ok: true,
-    camion: camion,
-    po: po,
-    total_tarimas: tarimasArray.length,
-    eventos: eventosDetalle,
-  };
-}
-
-function calcularEstatusEvento(camion, evento) {
-  if (!camion || !evento) return { completado: false };
-
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const hojaCatalogo = ss.getSheetByName(HOJA_CATALOGO);
-  const hojaEventos = ss.getSheetByName(HOJA_EVENTOS);
-
-  const datosCatalogo = hojaCatalogo.getDataRange().getValues();
-  const tarimas = new Set();
-  for (let i = 1; i < datosCatalogo.length; i++) {
-    if (datosCatalogo[i][3] === camion) tarimas.add(normalizarQR(datosCatalogo[i][0]));
+    html += '</div>';
+    card.innerHTML = html;
+    card.addEventListener("click", () => verDetalleCamion(camion.camion));
+    return card;
   }
 
-  const datosEventos = hojaEventos.getDataRange().getValues();
-  const registradas = new Set();
-  for (let i = 1; i < datosEventos.length; i++) {
-    if (datosEventos[i][7] === camion && datosEventos[i][5] === evento) {
-      registradas.add(normalizarQR(datosEventos[i][1]));
+  async function verDetalleCamion(camion) {
+    mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Cargando detalle...";
+    try {
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
+      if (!data.ok) throw new Error("Error al cargar detalle");
+      mostrarDetalleCamion(data);
+    } catch (e) {
+      alert("Error al cargar detalle:\n\n" + e.message);
+      verEstatusCamiones();
     }
   }
 
-  return {
-    completado: registradas.size >= tarimas.size && tarimas.size > 0,
-    registradas: registradas.size,
-    total: tarimas.size,
-  };
-}
+  function mostrarDetalleCamion(data) {
+    document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
 
-// ═══════════════════════════════════════════════════════════════════
-// ACTUALIZAR ESTADO ACTUAL
-// ═══════════════════════════════════════════════════════════════════
+    const contenedor = document.getElementById("detalle-camion");
+    contenedor.innerHTML = "";
 
-function actualizarEstadoActual(qrId) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-  const hojaEventos = ss.getSheetByName(HOJA_EVENTOS);
-  const hojaEstado = ss.getSheetByName(HOJA_ESTADO);
+    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
 
-  const datos = hojaEventos.getDataRange().getValues();
-  let ultimoEvento = null;
+    let html = '<div class="detalle-info">' +
+               '<p><b>PO:</b> ' + (data.po || '-') + '</p>' +
+               '<p><b>Total tarimas:</b> ' + data.total_tarimas + '</p>' +
+               '</div>';
 
-  for (let i = datos.length - 1; i >= 1; i--) {
-    if (datos[i][1] === qrId) {
-      ultimoEvento = datos[i];
-      break;
-    }
-  }
+    EVS.forEach(ev => {
+      const info = EVENTOS[ev];
+      const e = data.eventos[ev];
+      if (!info || !e) return;
+      if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
 
-  if (!ultimoEvento) return;
+      let status, clase;
+      if (e.completado) {
+        status = "✅ COMPLETADO";
+        clase = "completado";
+      } else if (e.registradas.length > 0) {
+        status = "⏳ FALTAN " + e.faltantes.length;
+        clase = "parcial";
+      } else {
+        status = "⏳ PENDIENTE";
+        clase = "pendiente";
+      }
 
-  const filaNueva = [
-    qrId,
-    ultimoEvento[7], ultimoEvento[8], ultimoEvento[9],
-    ultimoEvento[10], ultimoEvento[11], ultimoEvento[12],
-    ultimoEvento[5], ultimoEvento[2], ultimoEvento[3],
-    ultimoEvento[6], 0, "ACTIVO",
-  ];
+      html += '<div class="detalle-evento ' + clase + '">';
+      html += '<h4>' + info.icono + ' ' + info.etiqueta + '</h4>';
+      html += '<p class="detalle-status">' + status + '</p>';
+      html += '<p class="detalle-numero">' + e.registradas.length + '/' + e.total + '</p>';
 
-  const datosEstado = hojaEstado.getDataRange().getValues();
-  let filaExistente = -1;
-  for (let i = 1; i < datosEstado.length; i++) {
-    if (datosEstado[i][0] === qrId) {
-      filaExistente = i + 1;
-      break;
-    }
-  }
+      if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
+        html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary>';
+        html += '<ul class="lista-faltantes">';
+        e.faltantes.forEach(q => { html += '<li>' + q + '</li>'; });
+        html += '</ul></details>';
+      } else if (e.faltantes.length > 30) {
+        html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
+      }
 
-  if (filaExistente > 0) {
-    hojaEstado.getRange(filaExistente, 1, 1, filaNueva.length).setValues([filaNueva]);
-  } else {
-    hojaEstado.appendRow(filaNueva);
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════
-// CORREOS
-// ═══════════════════════════════════════════════════════════════════
-
-function enviarCorreoCompletado(camion, evento, estatus) {
-  const eventoTexto = formatearEvento(evento);
-  const asunto = "✅ " + eventoTexto + " COMPLETADO - " + camion + " (" + estatus.registradas + "/" + estatus.total + ")";
-
-  const cuerpoHTML = `
-    <div style="font-family: Arial, sans-serif; max-width: 700px;">
-      <h2 style="color: #1F7A1F;">✅ ${eventoTexto} COMPLETADO</h2>
-      <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
-        <tr><td style="padding: 8px; background: #F2F2F2;"><b>Camión:</b></td>
-            <td style="padding: 8px;"><b>${camion}</b></td></tr>
-        <tr><td style="padding: 8px; background: #F2F2F2;"><b>Evento:</b></td>
-            <td style="padding: 8px;">${eventoTexto}</td></tr>
-        <tr><td style="padding: 8px; background: #F2F2F2;"><b>Tarimas registradas:</b></td>
-            <td style="padding: 8px;"><b>${estatus.registradas} de ${estatus.total}</b></td></tr>
-        <tr><td style="padding: 8px; background: #F2F2F2;"><b>Fecha:</b></td>
-            <td style="padding: 8px;">${Utilities.formatDate(new Date(), "America/Mexico_City", "dd/MM/yyyy HH:mm:ss")}</td></tr>
-      </table>
-      <p style="color: #888; font-size: 11px; margin-top: 30px;">
-        Sistema Visor Tarimas - Mediese
-      </p>
-    </div>
-  `;
-
-  try {
-    MailApp.sendEmail({
-      to: DESTINATARIO,
-      cc: CC_COMPLETADO,
-      subject: asunto,
-      htmlBody: cuerpoHTML,
+      html += '</div>';
     });
-  } catch (e) {
-    console.error("Error enviando correo:", e);
+
+    contenedor.innerHTML = html;
+    mostrarVista("view-detalle-camion");
   }
-}
 
-function enviarCorreoDevolucion(camion, estatus) {
-  const asunto = "🔄 DEVOLUCIÓN COMPLETA - " + camion + " (" + estatus.registradas + "/" + estatus.total + ")";
-
-  const cuerpoHTML = `
-    <div style="font-family: Arial, sans-serif; max-width: 700px;">
-      <h2 style="color: #C00000;">🔄 DEVOLUCIÓN COMPLETA</h2>
-      <table style="border-collapse: collapse; width: 100%; margin: 20px 0;">
-        <tr><td style="padding: 8px; background: #F2F2F2;"><b>Camión:</b></td>
-            <td style="padding: 8px;"><b>${camion}</b></td></tr>
-        <tr><td style="padding: 8px; background: #F2F2F2;"><b>Tarimas devueltas:</b></td>
-            <td style="padding: 8px;"><b>${estatus.registradas} de ${estatus.total}</b></td></tr>
-        <tr><td style="padding: 8px; background: #F2F2F2;"><b>Fecha:</b></td>
-            <td style="padding: 8px;">${Utilities.formatDate(new Date(), "America/Mexico_City", "dd/MM/yyyy HH:mm:ss")}</td></tr>
-      </table>
-      <p style="color: #888; font-size: 11px; margin-top: 30px;">
-        Sistema Visor Tarimas - Mediese
-      </p>
-    </div>
-  `;
-
-  try {
-    MailApp.sendEmail({
-      to: DESTINATARIO,
-      cc: CC_COMPLETADO,
-      subject: asunto,
-      htmlBody: cuerpoHTML,
-    });
-  } catch (e) {
-    console.error("Error enviando correo devolución:", e);
-  }
-}
-
-function formatearEvento(evento) {
-  const mapa = {
-    "SALIDA_PLANTA": "🚚 Salida de Planta",
-    "ADUANA_ENTRADA": "🛃 Entrada a Aduana",
-    "ADUANA_SALIDA": "📦 Salida de Aduana",
-    "ENTREGA_CEDIS": "✅ Entrega en CEDIS",
-    "DEVOLUCION": "🔄 Devolución",
-    "REUBICACION": "📍 Reubicación",
-  };
-  return mapa[evento] || evento;
-}
+  return { initLogin, initScanner };
+})();
