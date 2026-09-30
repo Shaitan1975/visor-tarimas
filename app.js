@@ -216,6 +216,14 @@ const App = (() => {
     document.getElementById("btn-cerrar-estatus").addEventListener("click", () => mostrarVista("view-ready"));
     document.getElementById("btn-cerrar-detalle").addEventListener("click", verEstatusCamiones);
 
+    // Botón para limpiar el progreso del camión actual
+    document.getElementById("btn-limpiar-progreso").addEventListener("click", () => {
+      if (confirm("¿Cerrar el progreso del camión actual?\n\nEl siguiente escaneo empezará un camión nuevo.")) {
+        limpiarCamionActual();
+        actualizarProgresoPantalla();
+      }
+    });
+
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").then(reg => {
         reg.update().catch(() => {});
@@ -476,17 +484,22 @@ const App = (() => {
   // PROGRESO EN PANTALLA PRINCIPAL
   // ═══════════════════════════════════════════════════════════
 
-  async function actualizarProgresoPantalla() {
+    async function actualizarProgresoPantalla() {
     const camion = getCamionActual();
     const contenedor = document.getElementById("progreso-camion");
+    const btnLimpiar = document.getElementById("btn-limpiar-progreso");
 
     if (!contenedor) return;
 
     if (!camion) {
       contenedor.innerHTML = "";
       contenedor.classList.add("hidden");
+      if (btnLimpiar) btnLimpiar.classList.add("hidden");
       return;
     }
+
+    // Mostrar el botón de limpiar cuando hay un camión activo
+    if (btnLimpiar) btnLimpiar.classList.remove("hidden");
 
     contenedor.classList.remove("hidden");
     contenedor.innerHTML = '<div class="progreso-loading">⏳ Cargando progreso...</div>';
@@ -523,6 +536,16 @@ const App = (() => {
         html += '<span class="progreso-faltan">⏳ Faltan ' + ev.faltantes.length + '</span>';
       }
       html += '</div>';
+
+      // 🔔 Alerta cuando el camión se completa por primera vez
+      if (completado && !window['camion_' + camion + '_completado_alertado']) {
+        window['camion_' + camion + '_completado_alertado'] = true;
+        setTimeout(() => {
+          alert("✅ ¡CAMIÓN " + camion + " COMPLETADO!\n\n" +
+                "Se registraron las " + ev.total + " tarimas del evento " + info.etiqueta + ".\n\n" +
+                "Puedes cerrar el progreso o escanear otro camión.");
+        }, 500);
+      }
 
       // Lista de tarimas registradas (todas)
       if (ev.registradas.length > 0) {
