@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v21)
-// Con progreso + alerta + registro manual admin
+// VISOR TARIMAS - LÓGICA DE LA PWA (v22)
+// Con progreso + alerta + registro manual solo para admins logueados
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -9,8 +9,7 @@ const CONFIG = {
   SALT_PBKDF2: "salt-fijo-empresa-2026",
   ITERACIONES: 100000,
   SESSION_KEY: "visor_tarimas_session",
-  CAMION_KEY: "visor_tarimas_camion_actual",
-  CLAVE_ADMIN: "MediesE2026$Admin"
+  CAMION_KEY: "visor_tarimas_camion_actual"
 };
 
 const EVENTOS = {
@@ -76,7 +75,10 @@ const App = (() => {
 
   async function verificarUsuario(usuario, password) {
     try {
-      const resp = await fetch("usuarios.json?t=" + Date.now());
+      const resp = await fetch("usuarios.json?t=" + Date.now(), {
+        cache: "no-store",
+        headers: { "Cache-Control": "no-cache" }
+      });
       const usuarios = await resp.json();
       const user = usuarios.find(u => u.user === usuario.toLowerCase().trim());
       if (!user) return null;
@@ -194,6 +196,11 @@ const App = (() => {
 
     document.getElementById("user-info").textContent = `${session.nombre} (${session.rol})`;
 
+    // ── Mostrar botón de Registro Manual solo a admins ──
+    if (session.rol === "admin") {
+      document.getElementById("btn-registro-manual").classList.remove("hidden");
+    }
+
     document.getElementById("btn-logout").addEventListener("click", () => {
       clearSession();
       window.location.href = "index.html";
@@ -233,10 +240,9 @@ const App = (() => {
       });
     }
 
-    // ──  (Admin) ──
+    // ── Registro manual (Admin) ──
     document.getElementById("btn-registro-manual").addEventListener("click", abrirRegistroManual);
     document.getElementById("btn-cerrar-manual").addEventListener("click", cerrarRegistroManual);
-    document.getElementById("btn-validar-clave").addEventListener("click", validarClaveAdmin);
     document.getElementById("manual-camion").addEventListener("change", onCamionSeleccionado);
     document.getElementById("btn-registrar-manual").addEventListener("click", registrarEventoManual);
     document.getElementById("btn-registrar-otro").addEventListener("click", resetFormularioManual);
@@ -596,58 +602,34 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // REGISTRO MANUAL (SOLO ADMIN)
+  // REGISTRO MANUAL (SOLO ADMIN LOGUEADO)
   // ═══════════════════════════════════════════════════════════
 
-  let adminActual = null;
-
   function abrirRegistroManual() {
-    adminActual = null;
-    document.getElementById("manual-paso-clave").classList.remove("hidden");
-    document.getElementById("manual-paso-form").classList.add("hidden");
-    document.getElementById("admin-usuario").value = "";
-    document.getElementById("admin-clave").value = "";
-    document.getElementById("manual-clave-error").textContent = "";
+    const session = getSession();
+
+    // Doble verificación (por si acaso)
+    if (!session || session.rol !== "admin") {
+      alert("No tienes permisos para acceder al registro manual.");
+      return;
+    }
+
+    // Resetear formulario
+    document.getElementById("manual-camion").value = "";
+    document.getElementById("manual-evento").value = "";
+    document.getElementById("manual-tarima").innerHTML = '<option value="">-- Primero selecciona un camión --</option>';
+    document.getElementById("manual-notas").value = "";
     document.getElementById("manual-registro-status").textContent = "";
     document.getElementById("manual-registro-status").className = "send-status";
     document.getElementById("btn-registrar-otro").classList.add("hidden");
+
+    // Cargar catálogo y mostrar vista
+    cargarCatalogoManual();
     mostrarVista("view-manual");
   }
 
   function cerrarRegistroManual() {
-    adminActual = null;
     mostrarVista("view-ready");
-  }
-
-  async function validarClaveAdmin() {
-    const usuario = document.getElementById("admin-usuario").value.trim().toLowerCase();
-    const password = document.getElementById("admin-clave").value;
-    const errorMsg = document.getElementById("manual-clave-error");
-
-    if (!usuario || !password) {
-      errorMsg.textContent = "Ingresa usuario y contraseña";
-      return;
-    }
-
-    errorMsg.textContent = "Verificando...";
-
-    const user = await verificarUsuario(usuario, password);
-
-    if (!user) {
-      errorMsg.textContent = "Usuario o contraseña incorrectos";
-      return;
-    }
-
-    if (user.rol !== "admin") {
-      errorMsg.textContent = "Tu usuario no tiene permisos de administrador";
-      return;
-    }
-
-    adminActual = user;
-    errorMsg.textContent = "";
-    document.getElementById("manual-paso-clave").classList.add("hidden");
-    document.getElementById("manual-paso-form").classList.remove("hidden");
-    cargarCatalogoManual();
   }
 
   async function cargarCatalogoManual() {
@@ -696,6 +678,13 @@ const App = (() => {
   }
 
   async function registrarEventoManual() {
+    const session = getSession();
+
+    if (!session || session.rol !== "admin") {
+      alert("Sesión inválida. Vuelve a iniciar sesión.");
+      return;
+    }
+
     const camion = document.getElementById("manual-camion").value;
     const evento = document.getElementById("manual-evento").value;
     const qrId = document.getElementById("manual-tarima").value;
@@ -705,12 +694,6 @@ const App = (() => {
     if (!camion) { statusEl.textContent = "Selecciona un camión"; statusEl.className = "send-status error"; return; }
     if (!evento) { statusEl.textContent = "Selecciona un evento"; statusEl.className = "send-status error"; return; }
     if (!qrId) { statusEl.textContent = "Selecciona una tarima"; statusEl.className = "send-status error"; return; }
-
-    if (!adminActual) {
-      statusEl.textContent = "Sesión de admin expirada. Vuelve a validar.";
-      statusEl.className = "send-status error";
-      return;
-    }
 
     statusEl.textContent = "Registrando...";
     statusEl.className = "send-status";
@@ -732,9 +715,9 @@ const App = (() => {
         sabor: sabor,
         num_tarima: numTarima,
         evento: evento,
-        usuario: adminActual.user,
-        nombre: adminActual.nombre,
-        rol: adminActual.rol,
+        usuario: session.user,
+        nombre: session.nombre,
+        rol: session.rol,
         notas: "[MANUAL] " + (notas || ""),
       };
 
@@ -778,6 +761,7 @@ const App = (() => {
     document.getElementById("manual-registro-status").className = "send-status";
     document.getElementById("btn-registrar-otro").classList.add("hidden");
   }
+
   // ═══════════════════════════════════════════════════════════
   // JSONP
   // ═══════════════════════════════════════════════════════════
