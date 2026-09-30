@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v19)
-// Con lista de tarimas en progreso + qr_id consistente con catálogo
+// VISOR TARIMAS - LÓGICA DE LA PWA (v20)
+// Con botón limpiar progreso + alerta al completar camión
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -216,13 +216,21 @@ const App = (() => {
     document.getElementById("btn-cerrar-estatus").addEventListener("click", () => mostrarVista("view-ready"));
     document.getElementById("btn-cerrar-detalle").addEventListener("click", verEstatusCamiones);
 
-    // Botón para limpiar el progreso del camión actual
-    document.getElementById("btn-limpiar-progreso").addEventListener("click", () => {
-      if (confirm("¿Cerrar el progreso del camión actual?\n\nEl siguiente escaneo empezará un camión nuevo.")) {
-        limpiarCamionActual();
-        actualizarProgresoPantalla();
-      }
-    });
+    // ── Botón para limpiar el progreso del camión actual ──
+    const btnLimpiar = document.getElementById("btn-limpiar-progreso");
+    if (btnLimpiar) {
+      btnLimpiar.addEventListener("click", () => {
+        if (confirm("¿Cerrar el progreso del camión actual?\n\nEl siguiente escaneo empezará un camión nuevo.")) {
+          const camion = getCamionActual();
+          if (camion) {
+            // Resetear la alerta para que vuelva a salir si se completa de nuevo
+            window['camion_' + camion + '_completado_alertado'] = false;
+          }
+          limpiarCamionActual();
+          actualizarProgresoPantalla();
+        }
+      });
+    }
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").then(reg => {
@@ -400,7 +408,7 @@ const App = (() => {
       datosActuales = datos;
       const session = getSession();
 
-      // ⬇️ AQUÍ EL CAMBIO CLAVE: qr_id usa el formato T01 (con cero) para que coincida con el catálogo
+      // Formato con ceros a la izquierda (T01) para que coincida con el catálogo
       const numTarimaStr = String(datos.num_tarima || "").padStart(2, "0");
 
       const payload = {
@@ -484,7 +492,7 @@ const App = (() => {
   // PROGRESO EN PANTALLA PRINCIPAL
   // ═══════════════════════════════════════════════════════════
 
-    async function actualizarProgresoPantalla() {
+  async function actualizarProgresoPantalla() {
     const camion = getCamionActual();
     const contenedor = document.getElementById("progreso-camion");
     const btnLimpiar = document.getElementById("btn-limpiar-progreso");
