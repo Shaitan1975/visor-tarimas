@@ -233,7 +233,7 @@ const App = (() => {
       });
     }
 
-    // ── Registro manual (Admin) ──
+    // ──  (Admin) ──
     document.getElementById("btn-registro-manual").addEventListener("click", abrirRegistroManual);
     document.getElementById("btn-cerrar-manual").addEventListener("click", cerrarRegistroManual);
     document.getElementById("btn-validar-clave").addEventListener("click", validarClaveAdmin);
@@ -599,9 +599,13 @@ const App = (() => {
   // REGISTRO MANUAL (SOLO ADMIN)
   // ═══════════════════════════════════════════════════════════
 
+  let adminActual = null;
+
   function abrirRegistroManual() {
+    adminActual = null;
     document.getElementById("manual-paso-clave").classList.remove("hidden");
     document.getElementById("manual-paso-form").classList.add("hidden");
+    document.getElementById("admin-usuario").value = "";
     document.getElementById("admin-clave").value = "";
     document.getElementById("manual-clave-error").textContent = "";
     document.getElementById("manual-registro-status").textContent = "";
@@ -611,21 +615,39 @@ const App = (() => {
   }
 
   function cerrarRegistroManual() {
+    adminActual = null;
     mostrarVista("view-ready");
   }
 
-  function validarClaveAdmin() {
-    const clave = document.getElementById("admin-clave").value;
+  async function validarClaveAdmin() {
+    const usuario = document.getElementById("admin-usuario").value.trim().toLowerCase();
+    const password = document.getElementById("admin-clave").value;
     const errorMsg = document.getElementById("manual-clave-error");
 
-    if (clave === CONFIG.CLAVE_ADMIN) {
-      errorMsg.textContent = "";
-      document.getElementById("manual-paso-clave").classList.add("hidden");
-      document.getElementById("manual-paso-form").classList.remove("hidden");
-      cargarCatalogoManual();
-    } else {
-      errorMsg.textContent = "Clave incorrecta";
+    if (!usuario || !password) {
+      errorMsg.textContent = "Ingresa usuario y contraseña";
+      return;
     }
+
+    errorMsg.textContent = "Verificando...";
+
+    const user = await verificarUsuario(usuario, password);
+
+    if (!user) {
+      errorMsg.textContent = "Usuario o contraseña incorrectos";
+      return;
+    }
+
+    if (user.rol !== "admin") {
+      errorMsg.textContent = "Tu usuario no tiene permisos de administrador";
+      return;
+    }
+
+    adminActual = user;
+    errorMsg.textContent = "";
+    document.getElementById("manual-paso-clave").classList.add("hidden");
+    document.getElementById("manual-paso-form").classList.remove("hidden");
+    cargarCatalogoManual();
   }
 
   async function cargarCatalogoManual() {
@@ -684,6 +706,12 @@ const App = (() => {
     if (!evento) { statusEl.textContent = "Selecciona un evento"; statusEl.className = "send-status error"; return; }
     if (!qrId) { statusEl.textContent = "Selecciona una tarima"; statusEl.className = "send-status error"; return; }
 
+    if (!adminActual) {
+      statusEl.textContent = "Sesión de admin expirada. Vuelve a validar.";
+      statusEl.className = "send-status error";
+      return;
+    }
+
     statusEl.textContent = "Registrando...";
     statusEl.className = "send-status";
 
@@ -693,8 +721,6 @@ const App = (() => {
       const dc = partes[1] ? partes[1].replace("DC", "") : "";
       const sabor = partes[2] || "";
       const numTarima = partes[3] ? partes[3].replace("T", "") : "";
-
-      const session = getSession();
 
       const payload = {
         accion: "evento",
@@ -706,9 +732,9 @@ const App = (() => {
         sabor: sabor,
         num_tarima: numTarima,
         evento: evento,
-        usuario: session ? session.user : "admin",
-        nombre: session ? session.nombre : "Admin",
-        rol: session ? session.rol : "admin",
+        usuario: adminActual.user,
+        nombre: adminActual.nombre,
+        rol: adminActual.rol,
         notas: "[MANUAL] " + (notas || ""),
       };
 
@@ -752,7 +778,6 @@ const App = (() => {
     document.getElementById("manual-registro-status").className = "send-status";
     document.getElementById("btn-registrar-otro").classList.add("hidden");
   }
-
   // ═══════════════════════════════════════════════════════════
   // JSONP
   // ═══════════════════════════════════════════════════════════
