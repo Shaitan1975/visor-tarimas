@@ -707,4 +707,231 @@ const App = (() => {
         num_tarima: numTarima,
         evento: evento,
         usuario: session ? session.user : "admin",
-        nombre: session ? session
+        nombre: session ? session.nombre : "Admin",
+        rol: session ? session.rol : "admin",
+        notas: "[MANUAL] " + (notas || ""),
+      };
+
+      const url = CONFIG.APPS_SCRIPT_URL
+        + "?accion=evento"
+        + "&data=" + encodeURIComponent(JSON.stringify(payload));
+
+      const resp = await jsonp(url);
+
+      if (!resp.ok) {
+        if (resp.duplicado) {
+          statusEl.textContent = "⚠️ Esta tarima ya tenía registrado este evento el " + resp.fecha_anterior;
+          statusEl.className = "send-status error";
+        } else {
+          statusEl.textContent = "❌ Error: " + (resp.error || "Desconocido");
+          statusEl.className = "send-status error";
+        }
+        return;
+      }
+
+      statusEl.textContent = "✅ Evento registrado correctamente";
+      statusEl.className = "send-status ok";
+
+      if (camion === getCamionActual()) {
+        setCamionActual(camion);
+      }
+
+      document.getElementById("btn-registrar-otro").classList.remove("hidden");
+
+    } catch (e) {
+      statusEl.textContent = "❌ Error: " + e.message;
+      statusEl.className = "send-status error";
+    }
+  }
+
+  function resetFormularioManual() {
+    document.getElementById("manual-evento").value = "";
+    document.getElementById("manual-tarima").value = "";
+    document.getElementById("manual-notas").value = "";
+    document.getElementById("manual-registro-status").textContent = "";
+    document.getElementById("manual-registro-status").className = "send-status";
+    document.getElementById("btn-registrar-otro").classList.add("hidden");
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // JSONP
+  // ═══════════════════════════════════════════════════════════
+
+  function jsonp(url) {
+    return new Promise((resolve, reject) => {
+      const callbackName = "jsonp_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+      window[callbackName] = (data) => {
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        resolve(data);
+      };
+      const script = document.createElement("script");
+      script.src = url + "&callback=" + callbackName;
+      script.onerror = () => {
+        delete window[callbackName];
+        if (document.body.contains(script)) document.body.removeChild(script);
+        reject(new Error("Error de red"));
+      };
+      document.body.appendChild(script);
+      setTimeout(() => {
+        if (window[callbackName]) {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
+          reject(new Error("Timeout"));
+        }
+      }, 15000);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ESTATUS DE CAMIONES
+  // ═══════════════════════════════════════════════════════════
+
+  async function verEstatusCamiones() {
+    mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Cargando estatus...";
+    try {
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camiones");
+      if (!data.ok) throw new Error("Error al cargar estatus");
+      mostrarListaCamiones(data.camiones);
+    } catch (e) {
+      alert("Error al cargar estatus:\n\n" + e.message);
+      mostrarVista("view-ready");
+    }
+  }
+
+  function mostrarListaCamiones(camiones) {
+    const contenedor = document.getElementById("lista-camiones");
+    contenedor.innerHTML = "";
+
+    const activos = camiones.filter(c => c.activo);
+    const completados = camiones.filter(c => !c.activo);
+
+    if (activos.length === 0 && completados.length === 0) {
+      contenedor.innerHTML = '<p style="text-align:center;padding:20px;">No hay camiones registrados.</p>';
+      mostrarVista("view-estatus");
+      return;
+    }
+
+    if (activos.length > 0) {
+      const titulo = document.createElement("h3");
+      titulo.textContent = "🔥 Camiones Activos";
+      titulo.style.marginTop = "10px";
+      contenedor.appendChild(titulo);
+      activos.forEach(c => contenedor.appendChild(crearTarjetaCamion(c)));
+    }
+
+    if (completados.length > 0) {
+      const titulo = document.createElement("h3");
+      titulo.textContent = "✅ Camiones Completados";
+      titulo.style.marginTop = "20px";
+      contenedor.appendChild(titulo);
+      completados.slice(0, 10).forEach(c => contenedor.appendChild(crearTarjetaCamion(c)));
+    }
+
+    mostrarVista("view-estatus");
+  }
+
+  function crearTarjetaCamion(camion) {
+    const card = document.createElement("div");
+    card.className = "camion-card";
+    if (camion.activo) card.classList.add("activo");
+
+    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
+
+    let html = '<div class="camion-titulo">🚚 ' + camion.camion + ' <span class="camion-total">(' + camion.total_tarimas + ' tarimas)</span></div>';
+    html += '<div class="eventos-lista">';
+
+    EVS.forEach(ev => {
+      const info = EVENTOS[ev];
+      const e = camion.eventos[ev];
+      if (!info || !e) return;
+      if (ev === "DEVOLUCION" && e.registradas === 0) return;
+
+      const cls = e.completado ? "completado" : "pendiente";
+      let faltanTexto = "";
+      if (!e.completado) {
+        faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
+      }
+
+      html += '<div class="evento-linea ' + cls + '">' +
+              '<span class="evento-icono">' + info.icono + '</span>' +
+              '<span class="evento-nombre">' + info.etiqueta + ' ' + faltanTexto + '</span>' +
+              '<span class="evento-progreso">' + e.registradas + '/' + e.total + '</span>' +
+              '<span class="evento-check">' + (e.completado ? '✅' : '⏳') + '</span>' +
+              '</div>';
+    });
+
+    html += '</div>';
+    card.innerHTML = html;
+    card.addEventListener("click", () => verDetalleCamion(camion.camion));
+    return card;
+  }
+
+  async function verDetalleCamion(camion) {
+    mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Cargando detalle...";
+    try {
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
+      if (!data.ok) throw new Error("Error al cargar detalle");
+      mostrarDetalleCamion(data);
+    } catch (e) {
+      alert("Error al cargar detalle:\n\n" + e.message);
+      verEstatusCamiones();
+    }
+  }
+
+  function mostrarDetalleCamion(data) {
+    document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
+
+    const contenedor = document.getElementById("detalle-camion");
+    contenedor.innerHTML = "";
+
+    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
+
+    let html = '<div class="detalle-info">' +
+               '<p><b>PO:</b> ' + (data.po || '-') + '</p>' +
+               '<p><b>Total tarimas:</b> ' + data.total_tarimas + '</p>' +
+               '</div>';
+
+    EVS.forEach(ev => {
+      const info = EVENTOS[ev];
+      const e = data.eventos[ev];
+      if (!info || !e) return;
+      if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
+
+      let status, clase;
+      if (e.completado) {
+        status = "✅ COMPLETADO";
+        clase = "completado";
+      } else if (e.registradas.length > 0) {
+        status = "⏳ FALTAN " + e.faltantes.length;
+        clase = "parcial";
+      } else {
+        status = "⏳ PENDIENTE";
+        clase = "pendiente";
+      }
+
+      html += '<div class="detalle-evento ' + clase + '">';
+      html += '<h4>' + info.icono + ' ' + info.etiqueta + '</h4>';
+      html += '<p class="detalle-status">' + status + '</p>';
+      html += '<p class="detalle-numero">' + e.registradas.length + '/' + e.total + '</p>';
+
+      if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
+        html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary>';
+        html += '<ul class="lista-faltantes">';
+        e.faltantes.forEach(q => { html += '<li>' + q + '</li>'; });
+        html += '</ul></details>';
+      } else if (e.faltantes.length > 30) {
+        html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
+      }
+
+      html += '</div>';
+    });
+
+    contenedor.innerHTML = html;
+    mostrarVista("view-detalle-camion");
+  }
+
+  return { initLogin, initScanner };
+})();
