@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v17)
-// Con lista de tarimas en progreso
+// VISOR TARIMAS - LÓGICA DE LA PWA (v18)
+// Con lista de tarimas en progreso (hasta 28 visibles)
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -430,12 +430,12 @@ const App = (() => {
         }
       }
 
-            // Guardar camión actual
+      // Guardar camión actual
       if (payload.camion) {
         setCamionActual(payload.camion);
       }
 
-      // ⬇️ AGREGA ESTA LÍNEA PARA ACTUALIZAR EL PROGRESO ⬇️
+      // Actualizar el progreso ANTES de mostrar el resultado
       await actualizarProgresoPantalla();
 
       setTimeout(() => mostrarExito(datos, session), 500);
@@ -506,7 +506,7 @@ const App = (() => {
 
       let html = '<div class="progreso-titulo">';
       html += '<span class="progreso-icono">🚚</span>';
-      html += '<span class="progreso-camion">' + camion + '</span>';
+      html += '<span class="progreso-camion-nombre">' + camion + '</span>';
       html += '<span class="progreso-evento">' + info.icono + ' ' + info.etiqueta + '</span>';
       html += '</div>';
 
@@ -523,7 +523,7 @@ const App = (() => {
       }
       html += '</div>';
 
-      // Lista de tarimas registradas
+      // Lista de tarimas registradas (todas)
       if (ev.registradas.length > 0) {
         html += '<div class="progreso-lista-titulo">';
         html += '<span>✅ Registradas (' + ev.registradas.length + '):</span>';
@@ -535,17 +535,18 @@ const App = (() => {
         html += '</div>';
       }
 
-      // Lista de faltantes (primeras 10)
+      // Lista de faltantes (hasta 28 visibles)
+      const MAX_FALTANTES = 28;
       if (ev.faltantes.length > 0 && !completado) {
         html += '<div class="progreso-lista-titulo">';
         html += '<span>⏳ Faltantes (' + ev.faltantes.length + '):</span>';
         html += '</div>';
         html += '<div class="progreso-lista progreso-lista-faltantes">';
-        ev.faltantes.slice(0, 10).forEach(qr => {
+        ev.faltantes.slice(0, MAX_FALTANTES).forEach(qr => {
           html += '<span class="chip-faltante">⏳ ' + qr + '</span>';
         });
-        if (ev.faltantes.length > 10) {
-          html += '<span class="chip-mas">+ ' + (ev.faltantes.length - 10) + ' más...</span>';
+        if (ev.faltantes.length > MAX_FALTANTES) {
+          html += '<span class="chip-mas">+ ' + (ev.faltantes.length - MAX_FALTANTES) + ' más...</span>';
         }
         html += '</div>';
       }
