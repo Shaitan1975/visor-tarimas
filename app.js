@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v20)
-// Con botón limpiar progreso + alerta al completar camión
+// VISOR TARIMAS - LÓGICA DE LA PWA (v21)
+// Con progreso + alerta + registro manual admin
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -9,7 +9,8 @@ const CONFIG = {
   SALT_PBKDF2: "salt-fijo-empresa-2026",
   ITERACIONES: 100000,
   SESSION_KEY: "visor_tarimas_session",
-  CAMION_KEY: "visor_tarimas_camion_actual"
+  CAMION_KEY: "visor_tarimas_camion_actual",
+  CLAVE_ADMIN: "MediesE2026$Admin"
 };
 
 const EVENTOS = {
@@ -33,6 +34,7 @@ const App = (() => {
   let modoActual = null;
   let modoSeleccionado = null;
   let datosActuales = null;
+  let catalogoCache = null;
 
   function getSession() {
     const s = localStorage.getItem(CONFIG.SESSION_KEY);
@@ -223,7 +225,6 @@ const App = (() => {
         if (confirm("¿Cerrar el progreso del camión actual?\n\nEl siguiente escaneo empezará un camión nuevo.")) {
           const camion = getCamionActual();
           if (camion) {
-            // Resetear la alerta para que vuelva a salir si se completa de nuevo
             window['camion_' + camion + '_completado_alertado'] = false;
           }
           limpiarCamionActual();
@@ -231,6 +232,14 @@ const App = (() => {
         }
       });
     }
+
+    // ── Registro manual (Admin) ──
+    document.getElementById("btn-registro-manual").addEventListener("click", abrirRegistroManual);
+    document.getElementById("btn-cerrar-manual").addEventListener("click", cerrarRegistroManual);
+    document.getElementById("btn-validar-clave").addEventListener("click", validarClaveAdmin);
+    document.getElementById("manual-camion").addEventListener("change", onCamionSeleccionado);
+    document.getElementById("btn-registrar-manual").addEventListener("click", registrarEventoManual);
+    document.getElementById("btn-registrar-otro").addEventListener("click", resetFormularioManual);
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").then(reg => {
@@ -275,7 +284,7 @@ const App = (() => {
   }
 
   function mostrarSelector(eventos) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion"]
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion", "view-manual"]
       .forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add("hidden");
@@ -332,7 +341,7 @@ const App = (() => {
   }
 
   function mostrarVista(id) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion"]
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion", "view-manual"]
       .forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add("hidden");
@@ -408,7 +417,6 @@ const App = (() => {
       datosActuales = datos;
       const session = getSession();
 
-      // Formato con ceros a la izquierda (T01) para que coincida con el catálogo
       const numTarimaStr = String(datos.num_tarima || "").padStart(2, "0");
 
       const payload = {
@@ -506,7 +514,6 @@ const App = (() => {
       return;
     }
 
-    // Mostrar el botón de limpiar cuando hay un camión activo
     if (btnLimpiar) btnLimpiar.classList.remove("hidden");
 
     contenedor.classList.remove("hidden");
@@ -555,7 +562,6 @@ const App = (() => {
         }, 500);
       }
 
-      // Lista de tarimas registradas (todas)
       if (ev.registradas.length > 0) {
         html += '<div class="progreso-lista-titulo">';
         html += '<span>✅ Registradas (' + ev.registradas.length + '):</span>';
@@ -567,7 +573,6 @@ const App = (() => {
         html += '</div>';
       }
 
-      // Lista de faltantes (hasta 28 visibles)
       const MAX_FALTANTES = 28;
       if (ev.faltantes.length > 0 && !completado) {
         html += '<div class="progreso-lista-titulo">';
@@ -591,184 +596,115 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // JSONP
+  // REGISTRO MANUAL (SOLO ADMIN)
   // ═══════════════════════════════════════════════════════════
 
-  function jsonp(url) {
-    return new Promise((resolve, reject) => {
-      const callbackName = "jsonp_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-      window[callbackName] = (data) => {
-        delete window[callbackName];
-        if (document.body.contains(script)) document.body.removeChild(script);
-        resolve(data);
-      };
-      const script = document.createElement("script");
-      script.src = url + "&callback=" + callbackName;
-      script.onerror = () => {
-        delete window[callbackName];
-        if (document.body.contains(script)) document.body.removeChild(script);
-        reject(new Error("Error de red"));
-      };
-      document.body.appendChild(script);
-      setTimeout(() => {
-        if (window[callbackName]) {
-          delete window[callbackName];
-          if (document.body.contains(script)) document.body.removeChild(script);
-          reject(new Error("Timeout"));
-        }
-      }, 15000);
-    });
+  function abrirRegistroManual() {
+    document.getElementById("manual-paso-clave").classList.remove("hidden");
+    document.getElementById("manual-paso-form").classList.add("hidden");
+    document.getElementById("admin-clave").value = "";
+    document.getElementById("manual-clave-error").textContent = "";
+    document.getElementById("manual-registro-status").textContent = "";
+    document.getElementById("manual-registro-status").className = "send-status";
+    document.getElementById("btn-registrar-otro").classList.add("hidden");
+    mostrarVista("view-manual");
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // ESTATUS DE CAMIONES
-  // ═══════════════════════════════════════════════════════════
+  function cerrarRegistroManual() {
+    mostrarVista("view-ready");
+  }
 
-  async function verEstatusCamiones() {
-    mostrarVista("view-loading");
-    document.getElementById("loading-text").textContent = "Cargando estatus...";
-    try {
-      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camiones");
-      if (!data.ok) throw new Error("Error al cargar estatus");
-      mostrarListaCamiones(data.camiones);
-    } catch (e) {
-      alert("Error al cargar estatus:\n\n" + e.message);
-      mostrarVista("view-ready");
+  function validarClaveAdmin() {
+    const clave = document.getElementById("admin-clave").value;
+    const errorMsg = document.getElementById("manual-clave-error");
+
+    if (clave === CONFIG.CLAVE_ADMIN) {
+      errorMsg.textContent = "";
+      document.getElementById("manual-paso-clave").classList.add("hidden");
+      document.getElementById("manual-paso-form").classList.remove("hidden");
+      cargarCatalogoManual();
+    } else {
+      errorMsg.textContent = "Clave incorrecta";
     }
   }
 
-  function mostrarListaCamiones(camiones) {
-    const contenedor = document.getElementById("lista-camiones");
-    contenedor.innerHTML = "";
+  async function cargarCatalogoManual() {
+    const selectCamion = document.getElementById("manual-camion");
+    selectCamion.innerHTML = '<option value="">-- Cargando camiones... --</option>';
 
-    const activos = camiones.filter(c => c.activo);
-    const completados = camiones.filter(c => !c.activo);
+    try {
+      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=listar_catalogo");
+      if (!data.ok) throw new Error("Error al cargar catálogo");
 
-    if (activos.length === 0 && completados.length === 0) {
-      contenedor.innerHTML = '<p style="text-align:center;padding:20px;">No hay camiones registrados.</p>';
-      mostrarVista("view-estatus");
+      catalogoCache = data.camiones;
+      selectCamion.innerHTML = '<option value="">-- Selecciona un camión --</option>';
+
+      data.camiones.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.camion;
+        opt.textContent = c.camion + " (" + c.tarimas.length + " tarimas)";
+        selectCamion.appendChild(opt);
+      });
+
+    } catch (e) {
+      selectCamion.innerHTML = '<option value="">-- Error al cargar --</option>';
+      alert("Error al cargar catálogo: " + e.message);
+    }
+  }
+
+  function onCamionSeleccionado() {
+    const camion = document.getElementById("manual-camion").value;
+    const selectTarima = document.getElementById("manual-tarima");
+
+    if (!camion || !catalogoCache) {
+      selectTarima.innerHTML = '<option value="">-- Primero selecciona un camión --</option>';
       return;
     }
 
-    if (activos.length > 0) {
-      const titulo = document.createElement("h3");
-      titulo.textContent = "🔥 Camiones Activos";
-      titulo.style.marginTop = "10px";
-      contenedor.appendChild(titulo);
-      activos.forEach(c => contenedor.appendChild(crearTarjetaCamion(c)));
-    }
+    const infoCamion = catalogoCache.find(c => c.camion === camion);
+    if (!infoCamion) return;
 
-    if (completados.length > 0) {
-      const titulo = document.createElement("h3");
-      titulo.textContent = "✅ Camiones Completados";
-      titulo.style.marginTop = "20px";
-      contenedor.appendChild(titulo);
-      completados.slice(0, 10).forEach(c => contenedor.appendChild(crearTarjetaCamion(c)));
-    }
-
-    mostrarVista("view-estatus");
-  }
-
-  function crearTarjetaCamion(camion) {
-    const card = document.createElement("div");
-    card.className = "camion-card";
-    if (camion.activo) card.classList.add("activo");
-
-    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
-
-    let html = '<div class="camion-titulo">🚚 ' + camion.camion + ' <span class="camion-total">(' + camion.total_tarimas + ' tarimas)</span></div>';
-    html += '<div class="eventos-lista">';
-
-    EVS.forEach(ev => {
-      const info = EVENTOS[ev];
-      const e = camion.eventos[ev];
-      if (!info || !e) return;
-      if (ev === "DEVOLUCION" && e.registradas === 0) return;
-
-      const cls = e.completado ? "completado" : "pendiente";
-      let faltanTexto = "";
-      if (!e.completado) {
-        faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
-      }
-
-      html += '<div class="evento-linea ' + cls + '">' +
-              '<span class="evento-icono">' + info.icono + '</span>' +
-              '<span class="evento-nombre">' + info.etiqueta + ' ' + faltanTexto + '</span>' +
-              '<span class="evento-progreso">' + e.registradas + '/' + e.total + '</span>' +
-              '<span class="evento-check">' + (e.completado ? '✅' : '⏳') + '</span>' +
-              '</div>';
+    selectTarima.innerHTML = '<option value="">-- Selecciona una tarima --</option>';
+    infoCamion.tarimas.forEach(qr => {
+      const opt = document.createElement("option");
+      opt.value = qr;
+      opt.textContent = qr;
+      selectTarima.appendChild(opt);
     });
-
-    html += '</div>';
-    card.innerHTML = html;
-    card.addEventListener("click", () => verDetalleCamion(camion.camion));
-    return card;
   }
 
-  async function verDetalleCamion(camion) {
-    mostrarVista("view-loading");
-    document.getElementById("loading-text").textContent = "Cargando detalle...";
+  async function registrarEventoManual() {
+    const camion = document.getElementById("manual-camion").value;
+    const evento = document.getElementById("manual-evento").value;
+    const qrId = document.getElementById("manual-tarima").value;
+    const notas = document.getElementById("manual-notas").value;
+    const statusEl = document.getElementById("manual-registro-status");
+
+    if (!camion) { statusEl.textContent = "Selecciona un camión"; statusEl.className = "send-status error"; return; }
+    if (!evento) { statusEl.textContent = "Selecciona un evento"; statusEl.className = "send-status error"; return; }
+    if (!qrId) { statusEl.textContent = "Selecciona una tarima"; statusEl.className = "send-status error"; return; }
+
+    statusEl.textContent = "Registrando...";
+    statusEl.className = "send-status";
+
     try {
-      const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
-      if (!data.ok) throw new Error("Error al cargar detalle");
-      mostrarDetalleCamion(data);
-    } catch (e) {
-      alert("Error al cargar detalle:\n\n" + e.message);
-      verEstatusCamiones();
-    }
-  }
+      const infoCamion = catalogoCache.find(c => c.camion === camion);
+      const partes = qrId.split("-");
+      const dc = partes[1] ? partes[1].replace("DC", "") : "";
+      const sabor = partes[2] || "";
+      const numTarima = partes[3] ? partes[3].replace("T", "") : "";
 
-  function mostrarDetalleCamion(data) {
-    document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
+      const session = getSession();
 
-    const contenedor = document.getElementById("detalle-camion");
-    contenedor.innerHTML = "";
-
-    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
-
-    let html = '<div class="detalle-info">' +
-               '<p><b>PO:</b> ' + (data.po || '-') + '</p>' +
-               '<p><b>Total tarimas:</b> ' + data.total_tarimas + '</p>' +
-               '</div>';
-
-    EVS.forEach(ev => {
-      const info = EVENTOS[ev];
-      const e = data.eventos[ev];
-      if (!info || !e) return;
-      if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
-
-      let status, clase;
-      if (e.completado) {
-        status = "✅ COMPLETADO";
-        clase = "completado";
-      } else if (e.registradas.length > 0) {
-        status = "⏳ FALTAN " + e.faltantes.length;
-        clase = "parcial";
-      } else {
-        status = "⏳ PENDIENTE";
-        clase = "pendiente";
-      }
-
-      html += '<div class="detalle-evento ' + clase + '">';
-      html += '<h4>' + info.icono + ' ' + info.etiqueta + '</h4>';
-      html += '<p class="detalle-status">' + status + '</p>';
-      html += '<p class="detalle-numero">' + e.registradas.length + '/' + e.total + '</p>';
-
-      if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
-        html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary>';
-        html += '<ul class="lista-faltantes">';
-        e.faltantes.forEach(q => { html += '<li>' + q + '</li>'; });
-        html += '</ul></details>';
-      } else if (e.faltantes.length > 30) {
-        html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
-      }
-
-      html += '</div>';
-    });
-
-    contenedor.innerHTML = html;
-    mostrarVista("view-detalle-camion");
-  }
-
-  return { initLogin, initScanner };
-})();
+      const payload = {
+        accion: "evento",
+        qr_id: qrId,
+        camion: camion,
+        po: infoCamion ? infoCamion.po : "",
+        cedis: "99" + dc,
+        dc: dc,
+        sabor: sabor,
+        num_tarima: numTarima,
+        evento: evento,
+        usuario: session ? session.user : "admin",
+        nombre: session ? session
