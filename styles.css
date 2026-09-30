@@ -768,3 +768,80 @@ details summary {
 .btn-limpiar-progreso.hidden {
   display: none;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   BOTÓN LIMPIAR PROGRESO
+   ═══════════════════════════════════════════════════════════ */
+
+.btn-limpiar-progreso {
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #C00000;
+  background: #FFF5F5;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s;
+}
+
+.btn-limpiar-progreso:hover {
+  background: #FEE2E2;
+}
+
+.btn-limpiar-progreso:active {
+  transform: scale(0.98);
+}
+
+.btn-limpiar-progreso.hidden {
+  display: none;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   REGISTRO MANUAL (ADMIN)
+   ═══════════════════════════════════════════════════════════ */
+
+.manual-container {
+  background: white;
+  border-radius: var(--radio);
+  padding: 20px;
+  margin: 16px auto;
+  max-width: 500px;
+  box-shadow: var(--sombra);
+}
+
+.manual-descripcion {
+  color: var(--gris-texto);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.manual-select {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 16px;
+  border: 2px solid var(--gris-borde);
+  border-radius: 8px;
+  outline: none;
+  font-family: inherit;
+  background: white;
+  color: #1A202C;
+  transition: border-color 0.2s;
+}
+
+.manual-select:focus {
+  border-color: var(--azul-claro);
+}
+
+.send-status.ok {
+  color: var(--verde-ok);
+  font-weight: 600;
+}
+
+.send-status.error {
+  color: var(--rojo-error);
+  font-weight: 600;
+}
