@@ -226,7 +226,36 @@
       </button>
     </div>
   </section>
+<!-- Vista: CANCELAR EVENTO -->
+<section id="view-cancelar" class="view-section hidden">
+  <div class="manual-container">
+    <div class="estatus-header">
+      <h2>❌ Cancelar Evento</h2>
+      <button id="btn-cerrar-cancelar" class="btn-cerrar">✖</button>
+    </div>
 
+    <p class="manual-descripcion">
+      Confirma los datos del evento a cancelar. Se marcará como CANCELADO y ya no contará en los totales.
+    </p>
+
+    <div class="detalle-info" style="margin-bottom: 15px;">
+      <p><b>Camión:</b> <span id="cancelar-info-camion">-</span></p>
+      <p><b>Evento:</b> <span id="cancelar-info-evento">-</span></p>
+      <p><b>Tarima (QR):</b> <span id="cancelar-info-tarima">-</span></p>
+    </div>
+
+    <div class="input-group">
+      <label for="cancelar-motivo">Motivo de la cancelación *</label>
+      <input type="text" id="cancelar-motivo" placeholder="Ej: Registro por error, tarima duplicada, etc.">
+    </div>
+
+    <p id="cancelar-status" class="send-status"></p>
+
+    <button id="btn-confirmar-cancelar" class="btn-primary btn-large" style="background: #DC2626; border-color: #DC2626;">
+      ❌ Confirmar Cancelación
+    </button>
+  </div>
+</section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
