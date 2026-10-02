@@ -34,7 +34,7 @@ const App = (() => {
   let modoSeleccionado = null;
   let datosActuales = null;
   let catalogoCache = null;
-  let contextoCancelar = null;   // ⚠️ NUEVO: guarda { camion, evento, qrId }
+  let contextoCancelar = null;
 
   function getSession() {
     const s = localStorage.getItem(CONFIG.SESSION_KEY);
@@ -245,7 +245,6 @@ const App = (() => {
     document.getElementById("btn-registrar-manual").addEventListener("click", registrarEventoManual);
     document.getElementById("btn-registrar-otro").addEventListener("click", resetFormularioManual);
 
-    // ⚠️ NUEVO: botones de la vista cancelar
     const btnCerrarCancelar = document.getElementById("btn-cerrar-cancelar");
     if (btnCerrarCancelar) {
       btnCerrarCancelar.addEventListener("click", () => mostrarVista("view-detalle-camion"));
@@ -757,7 +756,7 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // ⚠️ NUEVO: CANCELAR EVENTOS (TARIMAS)
+  // CANCELAR EVENTOS (TARIMAS)
   // ═══════════════════════════════════════════════════════════
 
   function abrirFormularioCancelar(camion, evento, qrId) {
@@ -774,75 +773,38 @@ const App = (() => {
   }
 
   async function ejecutarCancelar() {
-  const session = getSession();
-  const statusEl = document.getElementById("cancelar-status");
+    const session = getSession();
+    const statusEl = document.getElementById("cancelar-status");
 
-  // ⚠️ VALIDAR ROL (Gerencia y Admin)
-  const ROLES_CANCELAR = ["gerencia", "admin"];
-  if (!session || !ROLES_CANCELAR.includes(session.rol)) {
-    statusEl.textContent = "Solo Gerencia y Admin pueden cancelar eventos";
-    statusEl.className = "send-status error";
-    return;
-  }
-
-  const motivo = document.getElementById("cancelar-motivo").value.trim();
-  if (!motivo) {
-    statusEl.textContent = "Escribe el motivo de la cancelación";
-    statusEl.className = "send-status error";
-    return;
-  }
-
-  if (!contextoCancelar) {
-    statusEl.textContent = "No hay evento seleccionado";
-    statusEl.className = "send-status error";
-    return;
-  }
-
-  if (!confirm("¿Confirmas cancelar el evento?\n\nCamión: " + contextoCancelar.camion +
-               "\nEvento: " + contextoCancelar.evento +
-               "\nTarima: " + contextoCancelar.qrId)) {
-    return;
-  }
-
-  statusEl.textContent = "Cancelando...";
-  statusEl.className = "send-status";
-
-  try {
-    const payload = {
-      qr_id: contextoCancelar.qrId,
-      camion: contextoCancelar.camion,
-      evento: contextoCancelar.evento,
-      motivo: motivo,
-      usuario: session.user,
-      nombre: session.nombre,
-      rol: session.rol,
-    };
-
-    const url = CONFIG.APPS_SCRIPT_URL
-      + "?accion=cancelar_evento"
-      + "&data=" + encodeURIComponent(JSON.stringify(payload));
-
-    const resp = await jsonp(url);
-
-    if (!resp.ok) {
-      statusEl.textContent = "❌ " + (resp.error || "Error desconocido");
+    const ROLES_CANCELAR = ["gerencia", "admin"];
+    if (!session || !ROLES_CANCELAR.includes(session.rol)) {
+      statusEl.textContent = "Solo Gerencia y Admin pueden cancelar eventos";
       statusEl.className = "send-status error";
       return;
     }
 
-    statusEl.textContent = "✅ " + (resp.mensaje || "Evento cancelado");
-    statusEl.className = "send-status ok";
+    const motivo = document.getElementById("cancelar-motivo").value.trim();
+    if (!motivo) {
+      statusEl.textContent = "Escribe el motivo de la cancelación";
+      statusEl.className = "send-status error";
+      return;
+    }
 
-    setTimeout(() => {
-      alert("✅ " + (resp.mensaje || "Evento cancelado") + "\n\nFilas canceladas: " + (resp.cancelados || 1));
-      verDetalleCamion(contextoCancelar.camion);
-    }, 800);
+    if (!contextoCancelar) {
+      statusEl.textContent = "No hay evento seleccionado";
+      statusEl.className = "send-status error";
+      return;
+    }
 
-  } catch (e) {
-    statusEl.textContent = "❌ " + e.message;
-    statusEl.className = "send-status error";
-  }
-}
+    if (!confirm("¿Confirmas cancelar el evento?\n\nCamión: " + contextoCancelar.camion +
+                 "\nEvento: " + contextoCancelar.evento +
+                 "\nTarima: " + contextoCancelar.qrId)) {
+      return;
+    }
+
+    statusEl.textContent = "Cancelando...";
+    statusEl.className = "send-status";
+
     try {
       const payload = {
         qr_id: contextoCancelar.qrId,
@@ -871,7 +833,6 @@ const App = (() => {
 
       setTimeout(() => {
         alert("✅ " + (resp.mensaje || "Evento cancelado") + "\n\nFilas canceladas: " + (resp.cancelados || 1));
-        // Volver al detalle del camión para ver el cambio
         verDetalleCamion(contextoCancelar.camion);
       }, 800);
 
@@ -1010,97 +971,92 @@ const App = (() => {
   }
 
   function mostrarDetalleCamion(data) {
-  document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
+    document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
 
-  const contenedor = document.getElementById("detalle-camion");
-  contenedor.innerHTML = "";
+    const contenedor = document.getElementById("detalle-camion");
+    contenedor.innerHTML = "";
 
-  // ⚠️ ROLES PERMITIDOS PARA CANCELAR
-  const ROLES_CANCELAR = ["gerencia", "admin"];
-  const session = getSession();
-  const puedeCancelar = session && ROLES_CANCELAR.includes(session.rol);
+    const ROLES_CANCELAR = ["gerencia", "admin"];
+    const session = getSession();
+    const puedeCancelar = session && ROLES_CANCELAR.includes(session.rol);
 
-  const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
+    const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
 
-  let html = '<div class="detalle-info">' +
-             '<p><b>PO:</b> ' + (data.po || '-') + '</p>' +
-             '<p><b>Total tarimas:</b> ' + data.total_tarimas + '</p>' +
-             '</div>';
+    let html = '<div class="detalle-info">' +
+               '<p><b>PO:</b> ' + (data.po || '-') + '</p>' +
+               '<p><b>Total tarimas:</b> ' + data.total_tarimas + '</p>' +
+               '</div>';
 
-  EVS.forEach(ev => {
-    const info = EVENTOS[ev];
-    const e = data.eventos[ev];
-    if (!info || !e) return;
-    if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
+    EVS.forEach(ev => {
+      const info = EVENTOS[ev];
+      const e = data.eventos[ev];
+      if (!info || !e) return;
+      if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
 
-    let status, clase;
-    if (e.completado) {
-      status = "✅ COMPLETADO";
-      clase = "completado";
-    } else if (e.registradas.length > 0) {
-      status = "⏳ FALTAN " + e.faltantes.length;
-      clase = "parcial";
-    } else {
-      status = "⏳ PENDIENTE";
-      clase = "pendiente";
-    }
-
-    html += '<div class="detalle-evento ' + clase + '">';
-    html += '<h4>' + info.icono + ' ' + info.etiqueta + '</h4>';
-    html += '<p class="detalle-status">' + status + '</p>';
-    html += '<p class="detalle-numero">' + e.registradas.length + '/' + e.total + '</p>';
-
-    // Lista de tarimas registradas
-    if (e.registradas.length > 0) {
-      html += '<details open><summary>Ver registradas (' + e.registradas.length + ')</summary>';
-
-      // Aviso si NO puede cancelar
-      if (!puedeCancelar) {
-        html += '<p style="font-size: 12px; color: #92400E; background: #FEF3C7; ' +
-                'padding: 8px; border-radius: 6px; margin: 8px 0;">' +
-                '⚠️ Solo <b>Gerencia</b> y <b>Admin</b> pueden cancelar eventos</p>';
+      let status, clase;
+      if (e.completado) {
+        status = "✅ COMPLETADO";
+        clase = "completado";
+      } else if (e.registradas.length > 0) {
+        status = "⏳ FALTAN " + e.faltantes.length;
+        clase = "parcial";
+      } else {
+        status = "⏳ PENDIENTE";
+        clase = "pendiente";
       }
 
-      html += '<ul class="lista-registradas">';
-      e.registradas.forEach(qr => {
-        html += '<li>' +
-                '<span class="qr-texto">' + qr + '</span>';
+      html += '<div class="detalle-evento ' + clase + '">';
+      html += '<h4>' + info.icono + ' ' + info.etiqueta + '</h4>';
+      html += '<p class="detalle-status">' + status + '</p>';
+      html += '<p class="detalle-numero">' + e.registradas.length + '/' + e.total + '</p>';
 
-        // ⚠️ Solo mostrar botón si es Gerencia/Admin
-        if (puedeCancelar) {
-          const escQr = qr.replace(/'/g, "\\'");
-          const escCamion = data.camion.replace(/'/g, "\\'");
-          html += '<button class="btn-cancelar-chico" ' +
-                  'onclick="event.stopPropagation(); App.abrirFormularioCancelar(\'' +
-                  escCamion + '\', \'' + ev + '\', \'' + escQr + '\')">❌ Cancelar</button>';
+      if (e.registradas.length > 0) {
+        html += '<details open><summary>Ver registradas (' + e.registradas.length + ')</summary>';
+
+        if (!puedeCancelar) {
+          html += '<p style="font-size: 12px; color: #92400E; background: #FEF3C7; ' +
+                  'padding: 8px; border-radius: 6px; margin: 8px 0;">' +
+                  '⚠️ Solo <b>Gerencia</b> y <b>Admin</b> pueden cancelar eventos</p>';
         }
 
-        html += '</li>';
-      });
-      html += '</ul></details>';
-    }
+        html += '<ul class="lista-registradas">';
+        e.registradas.forEach(qr => {
+          html += '<li>' +
+                  '<span class="qr-texto">' + qr + '</span>';
 
-    if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
-      html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary>';
-      html += '<ul class="lista-faltantes">';
-      e.faltantes.forEach(q => { html += '<li>' + q + '</li>'; });
-      html += '</ul></details>';
-    } else if (e.faltantes.length > 30) {
-      html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
-    }
+          if (puedeCancelar) {
+            const escQr = qr.replace(/'/g, "\\'");
+            const escCamion = data.camion.replace(/'/g, "\\'");
+            html += '<button class="btn-cancelar-chico" ' +
+                    'onclick="event.stopPropagation(); App.abrirFormularioCancelar(\'' +
+                    escCamion + '\', \'' + ev + '\', \'' + escQr + '\')">❌ Cancelar</button>';
+          }
 
-    html += '</div>';
-  });
+          html += '</li>';
+        });
+        html += '</ul></details>';
+      }
 
-  contenedor.innerHTML = html;
-  mostrarVista("view-detalle-camion");
-}
+      if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
+        html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary>';
+        html += '<ul class="lista-faltantes">';
+        e.faltantes.forEach(q => { html += '<li>' + q + '</li>'; });
+        html += '</ul></details>';
+      } else if (e.faltantes.length > 30) {
+        html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
+      }
 
-  // ⚠️ NUEVO: exponer funciones al window para onclick inline
+      html += '</div>';
+    });
+
+    contenedor.innerHTML = html;
+    mostrarVista("view-detalle-camion");
+  }
+
   return {
     initLogin,
     initScanner,
-    abrirFormularioCancelar,   // ← necesario para el onclick inline
+    abrirFormularioCancelar,
   };
 
 })();
