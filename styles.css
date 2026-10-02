@@ -845,3 +845,62 @@ details summary {
   color: var(--rojo-error);
   font-weight: 600;
 }
+
+/* ═══════════════════════════════════════════════════════════ */
+/* LISTA DE REGISTRADAS CON BOTÓN CANCELAR */
+/* ═══════════════════════════════════════════════════════════ */
+
+.lista-registradas {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+}
+
+.lista-registradas li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: #F9FAFB;
+  border-radius: 6px;
+  border-left: 3px solid #15803D;
+  font-size: 13px;
+}
+
+.lista-registradas .qr-texto {
+  color: #1F2937;
+  font-family: monospace;
+  flex: 1;
+  word-break: break-all;
+}
+
+.btn-cancelar-chico {
+  background: #FEE2E2;
+  color: #991B1B;
+  border: 1px solid #FCA5A5;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.btn-cancelar-chico:hover {
+  background: #FCA5A5;
+}
+
+/* Vista cancelar (usa .manual-container existente) */
+#view-cancelar .detalle-info {
+  background: #FEF3C7;
+  border-left: 4px solid #F59E0B;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+#view-cancelar .detalle-info p {
+  margin: 4px 0;
+  font-size: 14px;
+}
