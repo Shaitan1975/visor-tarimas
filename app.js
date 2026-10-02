@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v23)
-// Con progreso + alerta + registro manual admin + éxito inmediato
+// VISOR TARIMAS - LÓGICA DE LA PWA (v24)
+// Con progreso + alerta + registro manual admin + cancelar eventos
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -34,6 +34,7 @@ const App = (() => {
   let modoSeleccionado = null;
   let datosActuales = null;
   let catalogoCache = null;
+  let contextoCancelar = null;   // ⚠️ NUEVO: guarda { camion, evento, qrId }
 
   function getSession() {
     const s = localStorage.getItem(CONFIG.SESSION_KEY);
@@ -196,7 +197,6 @@ const App = (() => {
 
     document.getElementById("user-info").textContent = `${session.nombre} (${session.rol})`;
 
-    // ── Mostrar botón de Registro Manual solo a admins ──
     if (session.rol === "admin") {
       document.getElementById("btn-registro-manual").classList.remove("hidden");
     }
@@ -225,7 +225,6 @@ const App = (() => {
     document.getElementById("btn-cerrar-estatus").addEventListener("click", () => mostrarVista("view-ready"));
     document.getElementById("btn-cerrar-detalle").addEventListener("click", verEstatusCamiones);
 
-    // ── Botón para limpiar el progreso del camión actual ──
     const btnLimpiar = document.getElementById("btn-limpiar-progreso");
     if (btnLimpiar) {
       btnLimpiar.addEventListener("click", () => {
@@ -240,12 +239,21 @@ const App = (() => {
       });
     }
 
-    // ── Registro manual (Admin) ──
     document.getElementById("btn-registro-manual").addEventListener("click", abrirRegistroManual);
     document.getElementById("btn-cerrar-manual").addEventListener("click", cerrarRegistroManual);
     document.getElementById("manual-camion").addEventListener("change", onCamionSeleccionado);
     document.getElementById("btn-registrar-manual").addEventListener("click", registrarEventoManual);
     document.getElementById("btn-registrar-otro").addEventListener("click", resetFormularioManual);
+
+    // ⚠️ NUEVO: botones de la vista cancelar
+    const btnCerrarCancelar = document.getElementById("btn-cerrar-cancelar");
+    if (btnCerrarCancelar) {
+      btnCerrarCancelar.addEventListener("click", () => mostrarVista("view-detalle-camion"));
+    }
+    const btnConfirmarCancelar = document.getElementById("btn-confirmar-cancelar");
+    if (btnConfirmarCancelar) {
+      btnConfirmarCancelar.addEventListener("click", ejecutarCancelar);
+    }
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("sw.js").then(reg => {
@@ -290,7 +298,7 @@ const App = (() => {
   }
 
   function mostrarSelector(eventos) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion", "view-manual"]
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
       .forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add("hidden");
@@ -347,7 +355,7 @@ const App = (() => {
   }
 
   function mostrarVista(id) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion", "view-manual"]
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
       .forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add("hidden");
@@ -467,10 +475,7 @@ const App = (() => {
         setCamionActual(payload.camion);
       }
 
-      // ⚡ MEJORA: Mostrar la pantalla de éxito de inmediato
       setTimeout(() => mostrarExito(datos, session), 100);
-
-      // 🔄 Actualizar el progreso en segundo plano (no bloquea la UI)
       actualizarProgresoPantalla();
 
     } catch (e) {
@@ -503,10 +508,6 @@ const App = (() => {
     document.getElementById("meta-po").textContent = datos.po || "-";
     mostrarVista("view-result");
   }
-
-  // ═══════════════════════════════════════════════════════════
-  // PROGRESO EN PANTALLA PRINCIPAL
-  // ═══════════════════════════════════════════════════════════
 
   async function actualizarProgresoPantalla() {
     const camion = getCamionActual();
@@ -560,7 +561,6 @@ const App = (() => {
       }
       html += '</div>';
 
-      // 🔔 Alerta cuando el camión se completa por primera vez
       if (completado && !window['camion_' + camion + '_completado_alertado']) {
         window['camion_' + camion + '_completado_alertado'] = true;
         setTimeout(() => {
@@ -603,20 +603,13 @@ const App = (() => {
     }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // REGISTRO MANUAL (SOLO ADMIN LOGUEADO)
-  // ═══════════════════════════════════════════════════════════
-
   function abrirRegistroManual() {
     const session = getSession();
-
-    // Doble verificación (por si acaso)
     if (!session || session.rol !== "admin") {
       alert("No tienes permisos para acceder al registro manual.");
       return;
     }
 
-    // Resetear formulario
     document.getElementById("manual-camion").value = "";
     document.getElementById("manual-evento").value = "";
     document.getElementById("manual-tarima").innerHTML = '<option value="">-- Primero selecciona un camión --</option>';
@@ -625,7 +618,6 @@ const App = (() => {
     document.getElementById("manual-registro-status").className = "send-status";
     document.getElementById("btn-registrar-otro").classList.add("hidden");
 
-    // Cargar catálogo y mostrar vista
     cargarCatalogoManual();
     mostrarVista("view-manual");
   }
@@ -762,6 +754,93 @@ const App = (() => {
     document.getElementById("manual-registro-status").textContent = "";
     document.getElementById("manual-registro-status").className = "send-status";
     document.getElementById("btn-registrar-otro").classList.add("hidden");
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // ⚠️ NUEVO: CANCELAR EVENTOS (TARIMAS)
+  // ═══════════════════════════════════════════════════════════
+
+  function abrirFormularioCancelar(camion, evento, qrId) {
+    contextoCancelar = { camion, evento, qrId };
+
+    document.getElementById("cancelar-info-camion").textContent = camion;
+    document.getElementById("cancelar-info-evento").textContent = EVENTOS[evento]?.etiqueta || evento;
+    document.getElementById("cancelar-info-tarima").textContent = qrId;
+    document.getElementById("cancelar-motivo").value = "";
+    document.getElementById("cancelar-status").textContent = "";
+    document.getElementById("cancelar-status").className = "send-status";
+
+    mostrarVista("view-cancelar");
+  }
+
+  async function ejecutarCancelar() {
+    const session = getSession();
+    const statusEl = document.getElementById("cancelar-status");
+
+    if (!session || session.rol !== "admin") {
+      statusEl.textContent = "Solo administradores pueden cancelar";
+      statusEl.className = "send-status error";
+      return;
+    }
+
+    const motivo = document.getElementById("cancelar-motivo").value.trim();
+    if (!motivo) {
+      statusEl.textContent = "Escribe el motivo de la cancelación";
+      statusEl.className = "send-status error";
+      return;
+    }
+
+    if (!contextoCancelar) {
+      statusEl.textContent = "No hay evento seleccionado";
+      statusEl.className = "send-status error";
+      return;
+    }
+
+    if (!confirm("¿Confirmas cancelar el evento?\n\nCamión: " + contextoCancelar.camion +
+                 "\nEvento: " + contextoCancelar.evento +
+                 "\nTarima: " + contextoCancelar.qrId)) {
+      return;
+    }
+
+    statusEl.textContent = "Cancelando...";
+    statusEl.className = "send-status";
+
+    try {
+      const payload = {
+        qr_id: contextoCancelar.qrId,
+        camion: contextoCancelar.camion,
+        evento: contextoCancelar.evento,
+        motivo: motivo,
+        usuario: session.user,
+        nombre: session.nombre,
+        rol: session.rol,
+      };
+
+      const url = CONFIG.APPS_SCRIPT_URL
+        + "?accion=cancelar_evento"
+        + "&data=" + encodeURIComponent(JSON.stringify(payload));
+
+      const resp = await jsonp(url);
+
+      if (!resp.ok) {
+        statusEl.textContent = "❌ " + (resp.error || "Error desconocido");
+        statusEl.className = "send-status error";
+        return;
+      }
+
+      statusEl.textContent = "✅ " + (resp.mensaje || "Evento cancelado");
+      statusEl.className = "send-status ok";
+
+      setTimeout(() => {
+        alert("✅ " + (resp.mensaje || "Evento cancelado") + "\n\nFilas canceladas: " + (resp.cancelados || 1));
+        // Volver al detalle del camión para ver el cambio
+        verDetalleCamion(contextoCancelar.camion);
+      }, 800);
+
+    } catch (e) {
+      statusEl.textContent = "❌ " + e.message;
+      statusEl.className = "send-status error";
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -928,6 +1007,23 @@ const App = (() => {
       html += '<p class="detalle-status">' + status + '</p>';
       html += '<p class="detalle-numero">' + e.registradas.length + '/' + e.total + '</p>';
 
+      // ⚠️ NUEVO: Lista de tarimas registradas con botón Cancelar
+      if (e.registradas.length > 0) {
+        html += '<details open><summary>Ver registradas (' + e.registradas.length + ')</summary>';
+        html += '<ul class="lista-registradas">';
+        e.registradas.forEach(qr => {
+          const escQr = qr.replace(/'/g, "\\'");
+          const escCamion = data.camion.replace(/'/g, "\\'");
+          html += '<li>' +
+                  '<span class="qr-texto">' + qr + '</span>' +
+                  '<button class="btn-cancelar-chico" ' +
+                  'onclick="event.stopPropagation(); App.abrirFormularioCancelar(\'' +
+                  escCamion + '\', \'' + ev + '\', \'' + escQr + '\')">❌ Cancelar</button>' +
+                  '</li>';
+        });
+        html += '</ul></details>';
+      }
+
       if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
         html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary>';
         html += '<ul class="lista-faltantes">';
@@ -944,5 +1040,11 @@ const App = (() => {
     mostrarVista("view-detalle-camion");
   }
 
-  return { initLogin, initScanner };
+  // ⚠️ NUEVO: exponer funciones al window para onclick inline
+  return {
+    initLogin,
+    initScanner,
+    abrirFormularioCancelar,   // ← necesario para el onclick inline
+  };
+
 })();
