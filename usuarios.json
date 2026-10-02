@@ -2,7 +2,7 @@
   {
     "user": "ernesto.escobar",
     "nombre": "Ernesto Escobar",
-    "rol": "gerente",
+    "rol": "gerencia",
     "ubicacion": "planta",
     "eventos_permitidos": [
       "SALIDA_PLANTA"
@@ -38,7 +38,7 @@
   {
     "user": "olivia.barrios",
     "nombre": "Olivia Barrios",
-    "rol": "gerente",
+    "rol": "gerencia",
     "ubicacion": "planta",
     "eventos_permitidos": [
       "SALIDA_PLANTA"
