@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════════════
-// SERVICE WORKER - Visor Tarimas v7
+// SERVICE WORKER - Visor Tarimas v8
 // ═══════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'visor-v7';
+const CACHE_VERSION = 'visor-v8';   // ⚠️ v7 → v8 para forzar actualización
 const CACHE_NAME = CACHE_VERSION;
 
 const ARCHIVOS_CACHE = [
@@ -12,7 +12,9 @@ const ARCHIVOS_CACHE = [
   './app.js',
   './styles.css',
   './manifest.json',
-  './usuarios.json'
+  './usuarios.json',
+  './icono_192x192.png',   // ⚠️ NUEVO: cachear el favicon
+  './icono_512x512.png'    // ⚠️ NUEVO: cachear el favicon grande
 ];
 
 self.addEventListener('install', (event) => {
