@@ -1053,82 +1053,104 @@ const App = (() => {
     mostrarVista("view-detalle-camion");
   }
 
-  return {
-    initLogin,
-    initScanner,
-    abrirFormularioCancelar,
-  };
+return {
+  initLogin,
+  initScanner,
+  abrirFormularioCancelar,
+  jsonp,           // ← expuesto
+  getSession,      // ← expuesto
+};
 
 })();
 
 // ═══════════════════════════════════════════════════════════════════
-// PEDIDOS - Funciones de PWA
+// PEDIDOS - Funciones de PWA (integradas con App)
 // ═══════════════════════════════════════════════════════════════════
 
 const SKUS_VALIDOS = ["MK150", "MKLM150", "MKCH150"];
 
-async function cargarListaPedidos() {
-  const resp = await fetch(APPS_SCRIPT_URL + "?accion=listar_pedidos");
-  const data = await resp.json();
-  return data;
-}
-
-async function verPedido(po, cedis) {
-  const url = APPS_SCRIPT_URL + "?accion=ver_pedido&po=" + encodeURIComponent(po) + "&cedis=" + encodeURIComponent(cedis);
-  const resp = await fetch(url);
-  return await resp.json();
-}
-
-async function guardarPedido(po, cedis, fechaEntrega, skus) {
-  const body = {
-    po: po,
-    cedis: cedis,
-    fecha_entrega: fechaEntrega || "",
-    skus: skus,
-    usuario: usuarioActual.usuario,
-    nombre: usuarioActual.nombre,
-    rol: usuarioActual.rol
-  };
-  const url = APPS_SCRIPT_URL + "?accion=guardar_pedido&data=" + encodeURIComponent(JSON.stringify(body));
-  const resp = await fetch(url);
-  return await resp.json();
-}
-
-async function eliminarPedido(po, cedis) {
-  const body = {
-    po: po,
-    cedis: cedis,
-    usuario: usuarioActual.usuario,
-    rol: usuarioActual.rol
-  };
-  const url = APPS_SCRIPT_URL + "?accion=eliminar_pedido&data=" + encodeURIComponent(JSON.stringify(body));
-  const resp = await fetch(url);
-  return await resp.json();
-}
-
-async function refrescarStockPedido(po, cedis) {
-  const url = APPS_SCRIPT_URL + "?accion=refrescar_stock_pedido&po=" + encodeURIComponent(po) + "&cedis=" + encodeURIComponent(cedis);
-  const resp = await fetch(url);
-  return await resp.json();
-}
-
-// Estado global
 let pedidoActual = null;
 let skusFormTemporal = [];
 
-function volverMenu() {
-  mostrarPantalla("pantalla-menu");
+/**
+ * Obtiene la sesión actual desde localStorage.
+ */
+function getSessionGlobal() {
+  const s = localStorage.getItem(CONFIG.SESSION_KEY);
+  return s ? JSON.parse(s) : null;
 }
 
+/**
+ * Muestra una pantalla (login, scanner o pedidos) y oculta las demás.
+ */
 function mostrarPantalla(id) {
-  document.querySelectorAll(".pantalla").forEach(p => p.style.display = "none");
-  document.getElementById(id).style.display = "block";
+  // Ocultar login (si aplica)
+  const loginBody = document.querySelector(".login-body");
+  if (loginBody) loginBody.style.display = "none";
+
+  // Ocultar vistas del scanner
+  ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
+   "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
+    .forEach(v => {
+      const el = document.getElementById(v);
+      if (el) el.classList.add("hidden");
+    });
+
+  // Ocultar pantallas de pedidos
+  ["pantalla-pedidos", "pantalla-form-pedido", "pantalla-detalle-pedido"]
+    .forEach(p => {
+      const el = document.getElementById(p);
+      if (el) el.classList.add("hidden");
+    });
+
+  // Mostrar la pantalla solicitada
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.remove("hidden");
+    if (el.classList.contains("view-section")) {
+      el.classList.add("view-section");
+    }
+  }
 }
+
+/**
+ * Vuelve al selector de eventos del scanner.
+ */
+function volverMenu() {
+  // Ocultar pantallas de pedidos
+  ["pantalla-pedidos", "pantalla-form-pedido", "pantalla-detalle-pedido"]
+    .forEach(p => {
+      const el = document.getElementById(p);
+      if (el) el.classList.add("hidden");
+    });
+
+  // Mostrar selector del scanner
+  const selector = document.getElementById("view-selector");
+  if (selector) {
+    selector.classList.remove("hidden");
+  }
+}
+
+/**
+ * Llama al backend con JSONP (para evitar CORS).
+ */
+function llamarBackend(url) {
+  return App.jsonp(url);
+}
+
+// ─── Lista de pedidos ───
 
 async function mostrarListaPedidos() {
   mostrarPantalla("pantalla-pedidos");
-  const data = await cargarListaPedidos();
-  renderizarListaPedidos(data.pedidos || []);
+  const cont = document.getElementById("lista-pedidos");
+  cont.innerHTML = "<p>Cargando pedidos...</p>";
+
+  try {
+    const data = await llamarBackend(CONFIG.APPS_SCRIPT_URL + "?accion=listar_pedidos");
+    renderizarListaPedidos(data.pedidos || []);
+  } catch (e) {
+    cont.innerHTML = "<p>Error al cargar pedidos: " + e.message + "</p>";
+  }
 }
 
 function renderizarListaPedidos(pedidos) {
@@ -1138,14 +1160,15 @@ function renderizarListaPedidos(pedidos) {
     return;
   }
 
-  let html = "<table><thead><tr><th>PO</th><th>CEDIS</th><th>SKUs</th><th>PZ</th><th></th></tr></thead><tbody>";
+  let html = "<table style='width:100%;border-collapse:collapse;'>";
+  html += "<thead><tr style='background:#f2f2f2;'><th style='padding:8px;text-align:left;'>PO</th><th>CEDIS</th><th>SKUs</th><th>PZ</th><th></th></tr></thead><tbody>";
   for (const p of pedidos) {
-    html += `<tr>
-      <td>${p.po}</td>
-      <td>${p.cedis}</td>
-      <td>${p.skus.length}</td>
-      <td>${p.total_pz.toLocaleString()}</td>
-      <td><button onclick="abrirPedido('${p.po}','${p.cedis}')">Ver</button></td>
+    html += `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:8px;">${p.po}</td>
+      <td style="padding:8px;">${p.cedis}</td>
+      <td style="padding:8px;">${p.skus.length}</td>
+      <td style="padding:8px;">${p.total_pz.toLocaleString()}</td>
+      <td style="padding:8px;"><button onclick="abrirPedido('${p.po}','${p.cedis}')" style="padding:5px 10px;">Ver</button></td>
     </tr>`;
   }
   html += "</tbody></table>";
@@ -1164,6 +1187,7 @@ function mostrarFormPedido(pedidoExistente = null) {
   document.getElementById("form-cedis").value = "";
   document.getElementById("form-fecha-entrega").value = "";
   document.getElementById("titulo-form-pedido").textContent = "Nuevo pedido";
+  document.getElementById("form-pedido-status").textContent = "";
 
   if (pedidoExistente) {
     document.getElementById("form-po").value = pedidoExistente.po;
@@ -1183,12 +1207,12 @@ function renderizarSKUsForm() {
   const cont = document.getElementById("lista-skus-form");
   let html = "";
   skusFormTemporal.forEach((s, i) => {
-    html += `<div class="fila-sku">
-      <select onchange="cambiarSKU(${i}, this.value)">
+    html += `<div class="fila-sku" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;">
+      <select onchange="cambiarSKU(${i}, this.value)" style="padding:8px;border:1px solid #ccc;border-radius:6px;">
         ${SKUS_VALIDOS.map(sku => `<option value="${sku}" ${sku === s.sku ? "selected" : ""}>${sku}</option>`).join("")}
       </select>
-      <input type="number" inputmode="numeric" value="${s.pz}" onchange="cambiarPZ(${i}, this.value)">
-      <button onclick="quitarFilaSKU(${i})">🗑</button>
+      <input type="number" inputmode="numeric" value="${s.pz}" onchange="cambiarPZ(${i}, this.value)" style="padding:8px;border:1px solid #ccc;border-radius:6px;">
+      <button onclick="quitarFilaSKU(${i})" style="padding:8px;background:#FEE2E2;border:1px solid #FECACA;border-radius:6px;">🗑</button>
     </div>`;
   });
   cont.innerHTML = html;
@@ -1208,10 +1232,11 @@ function quitarFilaSKU(i) {
 function cambiarSKU(i, v) { skusFormTemporal[i].sku = v; }
 function cambiarPZ(i, v) { skusFormTemporal[i].pz = Number(v) || 0; }
 
-async function guardarPedidoForm() {
+async function guardarPedidoForm(evt) {
   const po = document.getElementById("form-po").value.trim();
   const cedis = document.getElementById("form-cedis").value.trim().padStart(3, "0");
   const fecha = document.getElementById("form-fecha-entrega").value;
+  const statusEl = document.getElementById("form-pedido-status");
 
   if (!po) return alert("Falta PO");
   if (!cedis) return alert("Falta CEDIS");
@@ -1219,28 +1244,59 @@ async function guardarPedidoForm() {
   const skus = skusFormTemporal.filter(s => s.pz > 0);
   if (skus.length === 0) return alert("Agrega al menos un SKU con cantidad");
 
-  const btn = event.target;
-  btn.disabled = true;
-  btn.textContent = "Calculando...";
+  const session = getSessionGlobal();
+  if (!session) return alert("Sesión expirada, vuelve a iniciar sesión");
 
-  const resp = await guardarPedido(po, cedis, fecha, skus);
-  btn.disabled = false;
-  btn.textContent = "Guardar y calcular";
+  const btn = evt ? evt.target : null;
+  if (btn) { btn.disabled = true; btn.textContent = "Calculando..."; }
+  statusEl.textContent = "Calculando explosión de insumos...";
+  statusEl.className = "send-status";
 
-  if (!resp.ok) return alert("Error: " + resp.error);
+  const body = {
+    po: po,
+    cedis: cedis,
+    fecha_entrega: fecha || "",
+    skus: skus,
+    usuario: session.user,
+    nombre: session.nombre,
+    rol: session.rol
+  };
 
-  await abrirPedido(po, cedis);
+  const url = CONFIG.APPS_SCRIPT_URL
+    + "?accion=guardar_pedido"
+    + "&data=" + encodeURIComponent(JSON.stringify(body));
+
+  try {
+    const resp = await llamarBackend(url);
+    if (!resp.ok) throw new Error(resp.error || "Error desconocido");
+
+    statusEl.textContent = "✅ Pedido guardado";
+    statusEl.className = "send-status ok";
+
+    await abrirPedido(po, cedis);
+  } catch (e) {
+    statusEl.textContent = "❌ " + e.message;
+    statusEl.className = "send-status error";
+    if (btn) { btn.disabled = false; btn.textContent = "✅ Guardar y calcular"; }
+  }
 }
 
-// ─── Detalle ───
+// ─── Detalle del pedido ───
 
 async function abrirPedido(po, cedis) {
-  const data = await verPedido(po, cedis);
-  if (!data.ok) return alert("Error: " + data.error);
+  try {
+    const url = CONFIG.APPS_SCRIPT_URL
+      + "?accion=ver_pedido&po=" + encodeURIComponent(po)
+      + "&cedis=" + encodeURIComponent(cedis);
+    const data = await llamarBackend(url);
+    if (!data.ok) throw new Error(data.error || "Pedido no encontrado");
 
-  pedidoActual = data;
-  renderizarDetallePedido(data);
-  mostrarPantalla("pantalla-detalle-pedido");
+    pedidoActual = data;
+    renderizarDetallePedido(data);
+    mostrarPantalla("pantalla-detalle-pedido");
+  } catch (e) {
+    alert("Error al abrir pedido: " + e.message);
+  }
 }
 
 function renderizarDetallePedido(p) {
@@ -1248,7 +1304,7 @@ function renderizarDetallePedido(p) {
     "PO " + p.po + " · CEDIS " + p.cedis;
 
   document.getElementById("info-pedido").innerHTML = `
-    <div class="info-pedido">
+    <div class="detalle-info" style="margin:15px 0;padding:10px;background:#f9f9f9;border-radius:8px;">
       <p><b>SKUs:</b> ${p.skus.length} · <b>Total piezas:</b> ${p.total_pz.toLocaleString()}</p>
       ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${p.fecha_entrega}</p>` : ""}
       <p><b>Capturado:</b> ${p.fecha_captura} por ${p.usuario}</p>
@@ -1267,15 +1323,16 @@ function renderizarConsolidado(explosion) {
     return;
   }
 
-  let html = "<table><thead><tr><th>Insumo</th><th>Necesario</th><th>Stock</th><th>Faltante</th><th>Estado</th></tr></thead><tbody>";
+  let html = "<table style='width:100%;border-collapse:collapse;font-size:13px;'>";
+  html += "<thead><tr style='background:#f2f2f2;'><th style='padding:8px;text-align:left;'>Insumo</th><th>Necesario</th><th>Stock</th><th>Faltante</th><th>Estado</th></tr></thead><tbody>";
   for (const e of explosion) {
     const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
-    html += `<tr>
-      <td>${e.insumo}</td>
-      <td>${e.cantidad_necesaria} ${e.unidad}</td>
-      <td>${e.stock_actual}</td>
-      <td>${e.faltante > 0 ? "+" + e.faltante : e.faltante}</td>
-      <td>${icon} ${e.estado}</td>
+    html += `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:8px;">${e.insumo}</td>
+      <td style="padding:8px;text-align:right;">${e.cantidad_necesaria} ${e.unidad}</td>
+      <td style="padding:8px;text-align:right;">${e.stock_actual}</td>
+      <td style="padding:8px;text-align:right;">${e.faltante > 0 ? "+" + e.faltante : e.faltante}</td>
+      <td style="padding:8px;text-align:center;">${icon} ${e.estado}</td>
     </tr>`;
   }
   html += "</tbody></table>";
@@ -1286,9 +1343,9 @@ function renderizarPorSKU(skus, explosion) {
   const cont = document.getElementById("tab-por-sku");
   let html = "";
   for (const s of skus) {
-    html += `<div class="bloque-sku">
-      <h4>${s.sku} · ${s.pz.toLocaleString()} PZ · ${s.pt_codigo}</h4>
-      <ul>`;
+    html += `<div class="bloque-sku" style="margin-bottom:15px;padding:10px;background:#f9f9f9;border-radius:8px;">
+      <h4 style="margin:0 0 8px 0;">${s.sku} · ${s.pz.toLocaleString()} PZ · ${s.pt_codigo}</h4>
+      <ul style="margin:0;padding-left:20px;font-size:13px;">`;
     for (const e of explosion) {
       const porSku = e.por_sku?.find(x => x.pt_codigo === s.sku || x.pt_codigo === s.pt_codigo);
       if (!porSku) continue;
@@ -1300,33 +1357,72 @@ function renderizarPorSKU(skus, explosion) {
   cont.innerHTML = html;
 }
 
-function cambiarTabPedido(tab) {
-  document.querySelectorAll("#pantalla-detalle-pedido .tab").forEach(t => t.classList.remove("activo"));
-  document.querySelectorAll("#pantalla-detalle-pedido .tab-contenido").forEach(c => c.style.display = "none");
-  document.querySelector(`#pantalla-detalle-pedido .tab[onclick*="${tab}"]`).classList.add("activo");
-  document.getElementById("tab-" + tab).style.display = "block";
+function cambiarTabPedido(tab, evt) {
+  const contenedor = document.getElementById("pantalla-detalle-pedido");
+  contenedor.querySelectorAll(".tab").forEach(t => t.classList.remove("activo"));
+  contenedor.querySelectorAll(".tab-contenido").forEach(c => c.classList.add("hidden"));
+
+  if (evt && evt.target) {
+    evt.target.classList.add("activo");
+  } else {
+    const tabBtn = contenedor.querySelector(`.tab[onclick*="${tab}"]`);
+    if (tabBtn) tabBtn.classList.add("activo");
+  }
+
+  const contenido = document.getElementById("tab-" + tab);
+  if (contenido) contenido.classList.remove("hidden");
 }
 
 // ─── Acciones sobre el pedido ───
 
 async function refrescarStock() {
   if (!pedidoActual) return;
-  const resp = await refrescarStockPedido(pedidoActual.po, pedidoActual.cedis);
-  if (!resp.ok) return alert("Error: " + resp.error);
-  pedidoActual.explosion = resp.explosion;
-  renderizarConsolidado(resp.explosion);
-  renderizarPorSKU(pedidoActual.skus, resp.explosion);
-  alert("Stock actualizado: " + resp.refrescado);
+  const url = CONFIG.APPS_SCRIPT_URL
+    + "?accion=refrescar_stock_pedido"
+    + "&po=" + encodeURIComponent(pedidoActual.po)
+    + "&cedis=" + encodeURIComponent(pedidoActual.cedis);
+
+  try {
+    const resp = await llamarBackend(url);
+    if (!resp.ok) throw new Error(resp.error);
+    pedidoActual.explosion = resp.explosion;
+    renderizarConsolidado(resp.explosion);
+    renderizarPorSKU(pedidoActual.skus, resp.explosion);
+    alert("Stock actualizado: " + resp.refrescado);
+  } catch (e) {
+    alert("Error al actualizar stock: " + e.message);
+  }
 }
 
 function editarPedidoActual() {
+  if (!pedidoActual) return;
   mostrarFormPedido(pedidoActual);
 }
 
 async function eliminarPedidoActual() {
+  if (!pedidoActual) return;
   if (!confirm("¿Eliminar este pedido? Se puede recuperar del historial.")) return;
-  const resp = await eliminarPedido(pedidoActual.po, pedidoActual.cedis);
-  if (!resp.ok) return alert("Error: " + resp.error);
-  alert("Pedido eliminado");
-  mostrarListaPedidos();
+
+  const session = getSessionGlobal();
+  if (!session) return alert("Sesión expirada");
+
+  const body = {
+    po: pedidoActual.po,
+    cedis: pedidoActual.cedis,
+    usuario: session.user,
+    rol: session.rol
+  };
+
+  const url = CONFIG.APPS_SCRIPT_URL
+    + "?accion=eliminar_pedido"
+    + "&data=" + encodeURIComponent(JSON.stringify(body));
+
+  try {
+    const resp = await llamarBackend(url);
+    if (!resp.ok) throw new Error(resp.error);
+    alert("Pedido eliminado");
+    mostrarListaPedidos();
+  } catch (e) {
+    alert("Error al eliminar: " + e.message);
+  }
 }
