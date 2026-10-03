@@ -1390,6 +1390,7 @@ function renderizarConsolidado(explosion) {
   html += "</tbody></table>";
   cont.innerHTML = html;
 }
+
 function renderizarPorSKU(skus, explosion) {
   const cont = document.getElementById("tab-por-sku");
   let html = "";
