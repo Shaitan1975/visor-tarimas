@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v24)
+// VISOR TARIMAS - LÓGICA DE LA PWA (v25)
 // Con progreso + alerta + registro manual admin + cancelar eventos
+// + módulo de pedidos con explosión de insumos y descripciones
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -200,6 +201,8 @@ const App = (() => {
     if (session.rol === "admin") {
       document.getElementById("btn-registro-manual").classList.remove("hidden");
     }
+
+    // Mostrar botón de Pedidos solo a Gerencia y Admin
     const ROLES_PEDIDOS = ["gerencia", "admin"];
     if (ROLES_PEDIDOS.includes(session.rol)) {
       const btnPedidos = document.getElementById("btn-pedidos");
@@ -1058,13 +1061,13 @@ const App = (() => {
     mostrarVista("view-detalle-camion");
   }
 
-return {
-  initLogin,
-  initScanner,
-  abrirFormularioCancelar,
-  jsonp,           // ← expuesto
-  getSession,      // ← expuesto
-};
+  return {
+    initLogin,
+    initScanner,
+    abrirFormularioCancelar,
+    jsonp,
+    getSession,
+  };
 
 })();
 
@@ -1112,9 +1115,6 @@ function mostrarPantalla(id) {
   const el = document.getElementById(id);
   if (el) {
     el.classList.remove("hidden");
-    if (el.classList.contains("view-section")) {
-      el.classList.add("view-section");
-    }
   }
 }
 
@@ -1321,22 +1321,34 @@ function renderizarDetallePedido(p) {
   cambiarTabPedido("consolidado");
 }
 
-function renderizarPorSKU(skus, explosion) {
-  const cont = document.getElementById("tab-por-sku");
-  let html = "";
-  for (const s of skus) {
-    html += `<div class="bloque-sku" style="margin-bottom:15px;padding:10px;background:#f9f9f9;border-radius:8px;">
-      <h4 style="margin:0 0 8px 0;">${s.sku} · ${s.pz.toLocaleString()} PZ · ${s.pt_codigo}</h4>
-      <ul style="margin:0;padding-left:20px;font-size:13px;">`;
-    for (const e of explosion) {
-      const porSku = e.por_sku?.find(x => x.pt_codigo === s.sku || x.pt_codigo === s.pt_codigo);
-      if (!porSku) continue;
-      const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
-      const desc = e.descripcion ? " (" + e.descripcion + ")" : "";
-      html += `<li><b>${e.insumo}</b>${desc}: ${porSku.cantidad} ${e.unidad} ${icon}</li>`;
-    }
-    html += "</ul></div>";
+function renderizarConsolidado(explosion) {
+  const cont = document.getElementById("tab-consolidado");
+  if (!explosion || explosion.length === 0) {
+    cont.innerHTML = "<p>Sin insumos calculados.</p>";
+    return;
   }
+
+  let html = "<table style='width:100%;border-collapse:collapse;font-size:13px;'>";
+  html += "<thead><tr style='background:#f2f2f2;'>";
+  html += "<th style='padding:8px;text-align:left;'>Insumo</th>";
+  html += "<th style='padding:8px;text-align:left;'>Descripción</th>";
+  html += "<th style='padding:8px;'>Necesario</th>";
+  html += "<th style='padding:8px;'>Stock</th>";
+  html += "<th style='padding:8px;'>Faltante</th>";
+  html += "<th style='padding:8px;'>Estado</th>";
+  html += "</tr></thead><tbody>";
+  for (const e of explosion) {
+    const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
+    html += `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:8px;font-family:monospace;font-size:12px;">${e.insumo}</td>
+      <td style="padding:8px;">${e.descripcion || "—"}</td>
+      <td style="padding:8px;text-align:right;">${e.cantidad_necesaria} ${e.unidad}</td>
+      <td style="padding:8px;text-align:right;">${e.stock_actual}</td>
+      <td style="padding:8px;text-align:right;">${e.faltante > 0 ? "+" + e.faltante : e.faltante}</td>
+      <td style="padding:8px;text-align:center;">${icon} ${e.estado}</td>
+    </tr>`;
+  }
+  html += "</tbody></table>";
   cont.innerHTML = html;
 }
 
@@ -1351,7 +1363,8 @@ function renderizarPorSKU(skus, explosion) {
       const porSku = e.por_sku?.find(x => x.pt_codigo === s.sku || x.pt_codigo === s.pt_codigo);
       if (!porSku) continue;
       const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
-      html += `<li>${e.insumo}: ${porSku.cantidad} ${e.unidad} ${icon}</li>`;
+      const desc = e.descripcion ? " (" + e.descripcion + ")" : "";
+      html += `<li><b>${e.insumo}</b>${desc}: ${porSku.cantidad} ${e.unidad} ${icon}</li>`;
     }
     html += "</ul></div>";
   }
