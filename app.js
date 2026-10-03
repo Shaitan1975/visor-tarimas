@@ -1304,6 +1304,34 @@ async function abrirPedido(po, cedis) {
   }
 }
 
+/**
+ * Convierte fechas ISO (2026-01-30T06:00:00.000Z) a formato dd/MM/yyyy HH:mm
+ */
+function formatearFecha(valor) {
+  if (!valor) return "";
+  
+  // Si ya está en dd/MM/yyyy o dd/MM/yyyy HH:mm
+  if (typeof valor === "string" && /^\d{1,2}\/\d{1,2}\/\d{4}/.test(valor)) {
+    return valor;
+  }
+  
+  // Si es ISO
+  try {
+    const fecha = new Date(valor);
+    if (isNaN(fecha.getTime())) return String(valor);
+    
+    const dd = String(fecha.getDate()).padStart(2, "0");
+    const mm = String(fecha.getMonth() + 1).padStart(2, "0");
+    const yyyy = fecha.getFullYear();
+    const hh = String(fecha.getHours()).padStart(2, "0");
+    const min = String(fecha.getMinutes()).padStart(2, "0");
+    
+    return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+  } catch (e) {
+    return String(valor);
+  }
+}
+
 function renderizarDetallePedido(p) {
   document.getElementById("titulo-detalle-pedido").textContent =
     "PO " + p.po + " · CEDIS " + p.cedis;
@@ -1311,8 +1339,8 @@ function renderizarDetallePedido(p) {
   document.getElementById("info-pedido").innerHTML = `
     <div class="detalle-info" style="margin:15px 0;padding:10px;background:#f9f9f9;border-radius:8px;">
       <p><b>SKUs:</b> ${p.skus.length} · <b>Total piezas:</b> ${p.total_pz.toLocaleString()}</p>
-      ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${p.fecha_entrega}</p>` : ""}
-      <p><b>Capturado:</b> ${p.fecha_captura} por ${p.usuario}</p>
+      ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
+      <p><b>Capturado:</b> ${formatearFecha(p.fecha_captura)} por ${p.usuario}</p>
     </div>
   `;
 
