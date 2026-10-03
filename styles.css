@@ -1144,3 +1144,28 @@ details summary {
     flex: 1 1 80px;
   }
 }
+
+/* Formulario de pedidos: forzar que los inputs no se salgan */
+#pantalla-form-pedido .manual-container {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 16px;
+}
+
+#pantalla-form-pedido input,
+#pantalla-form-pedido select,
+#pantalla-form-pedido button {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+#lista-skus-form {
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Botón "+ Agregar SKU" full width */
+#pantalla-form-pedido .btn-secondary {
+  width: 100%;
+}
