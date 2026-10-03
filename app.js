@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v25)
+// VISOR TARIMAS - LÓGICA DE LA PWA (v26)
 // Con progreso + alerta + registro manual admin + cancelar eventos
-// + módulo de pedidos con explosión de insumos y descripciones
+// + módulo de pedidos con MULTI-CEDIS y explosión de insumos
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -41,24 +41,14 @@ const App = (() => {
     const s = localStorage.getItem(CONFIG.SESSION_KEY);
     return s ? JSON.parse(s) : null;
   }
-  function setSession(d) {
-    localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(d));
-  }
-  function clearSession() {
-    localStorage.removeItem(CONFIG.SESSION_KEY);
-  }
+  function setSession(d) { localStorage.setItem(CONFIG.SESSION_KEY, JSON.stringify(d)); }
+  function clearSession() { localStorage.removeItem(CONFIG.SESSION_KEY); }
 
-  function getCamionActual() {
-    return localStorage.getItem(CONFIG.CAMION_KEY) || null;
-  }
+  function getCamionActual() { return localStorage.getItem(CONFIG.CAMION_KEY) || null; }
   function setCamionActual(camion) {
-    if (camion) {
-      localStorage.setItem(CONFIG.CAMION_KEY, camion);
-    }
+    if (camion) localStorage.setItem(CONFIG.CAMION_KEY, camion);
   }
-  function limpiarCamionActual() {
-    localStorage.removeItem(CONFIG.CAMION_KEY);
-  }
+  function limpiarCamionActual() { localStorage.removeItem(CONFIG.CAMION_KEY); }
 
   async function pbkdf2Hash(password, saltHex) {
     const enc = new TextEncoder();
@@ -124,9 +114,7 @@ const App = (() => {
     const partes = {};
     texto.split("|").forEach(p => {
       const idx = p.indexOf(":");
-      if (idx > 0) {
-        partes[p.substring(0, idx).trim()] = p.substring(idx + 1).trim();
-      }
+      if (idx > 0) partes[p.substring(0, idx).trim()] = p.substring(idx + 1).trim();
     });
     let lotes = [];
     if (partes.LOTES) {
@@ -144,25 +132,17 @@ const App = (() => {
     const tarima = partes.TARIMA || "";
     return {
       o: dc, l: tarima,
-      po: partes.PO || "",
-      cedis: partes.CEDIS || "",
-      dc: dc,
-      s: partes.S || "",
-      c: partes.CAM || "",
-      camion: partes.CAM || "",
-      num_tarima: tarima,
-      t: tarima,
+      po: partes.PO || "", cedis: partes.CEDIS || "",
+      dc: dc, s: partes.S || "",
+      c: partes.CAM || "", camion: partes.CAM || "",
+      num_tarima: tarima, t: tarima,
       tot: partes.TOT || "",
-      lotes: lotes,
-      es_pt: true,
+      lotes: lotes, es_pt: true,
     };
   }
 
   function initLogin() {
-    if (getSession()) {
-      window.location.href = "scanner.html";
-      return;
-    }
+    if (getSession()) { window.location.href = "scanner.html"; return; }
     const form = document.getElementById("login-form");
     const errorMsg = document.getElementById("error-msg");
     const btn = form.querySelector("button");
@@ -191,10 +171,7 @@ const App = (() => {
 
   function initScanner() {
     const session = getSession();
-    if (!session) {
-      window.location.href = "index.html";
-      return;
-    }
+    if (!session) { window.location.href = "index.html"; return; }
 
     document.getElementById("user-info").textContent = `${session.nombre} (${session.rol})`;
 
@@ -202,7 +179,6 @@ const App = (() => {
       document.getElementById("btn-registro-manual").classList.remove("hidden");
     }
 
-    // Mostrar botón de Pedidos solo a Gerencia y Admin
     const ROLES_PEDIDOS = ["gerencia", "admin"];
     if (ROLES_PEDIDOS.includes(session.rol)) {
       const btnPedidos = document.getElementById("btn-pedidos");
@@ -238,9 +214,7 @@ const App = (() => {
       btnLimpiar.addEventListener("click", () => {
         if (confirm("¿Cerrar el progreso del camión actual?\n\nEl siguiente escaneo empezará un camión nuevo.")) {
           const camion = getCamionActual();
-          if (camion) {
-            window['camion_' + camion + '_completado_alertado'] = false;
-          }
+          if (camion) window['camion_' + camion + '_completado_alertado'] = false;
           limpiarCamionActual();
           actualizarProgresoPantalla();
         }
@@ -270,9 +244,7 @@ const App = (() => {
 
     window.addEventListener("focus", () => {
       const estatusVisible = !document.getElementById("view-estatus").classList.contains("hidden");
-      if (estatusVisible) {
-        verEstatusCamiones();
-      }
+      if (estatusVisible) verEstatusCamiones();
     });
 
     iniciarFlujo(session);
@@ -305,7 +277,8 @@ const App = (() => {
   }
 
   function mostrarSelector(eventos) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
+     "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
       .forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add("hidden");
@@ -362,16 +335,15 @@ const App = (() => {
   }
 
   function mostrarVista(id) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector", "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
+    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
+     "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
       .forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.add("hidden");
       });
     document.getElementById(id).classList.remove("hidden");
 
-    if (id === "view-ready") {
-      actualizarProgresoPantalla();
-    }
+    if (id === "view-ready") actualizarProgresoPantalla();
   }
 
   async function iniciarCamara() {
@@ -392,10 +364,7 @@ const App = (() => {
 
   function cancelarCamara() {
     scanning = false;
-    if (stream) {
-      stream.getTracks().forEach(t => t.stop());
-      stream = null;
-    }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     mostrarVista("view-ready");
   }
 
@@ -412,10 +381,7 @@ const App = (() => {
       const code = jsQR(imageData.data, imageData.width, imageData.height);
       if (code && code.data) {
         scanning = false;
-        if (stream) {
-          stream.getTracks().forEach(t => t.stop());
-          stream = null;
-        }
+        if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
         procesarQR(code.data);
         return;
       }
@@ -456,14 +422,9 @@ const App = (() => {
         notas: "",
       };
 
-      if (datos.lotes && datos.lotes.length > 0) {
-        payload.lotes = datos.lotes;
-      }
+      if (datos.lotes && datos.lotes.length > 0) payload.lotes = datos.lotes;
 
-      const url = CONFIG.APPS_SCRIPT_URL
-        + "?accion=evento"
-        + "&data=" + encodeURIComponent(JSON.stringify(payload));
-
+      const url = CONFIG.APPS_SCRIPT_URL + "?accion=evento&data=" + encodeURIComponent(JSON.stringify(payload));
       const resp = await jsonp(url);
 
       if (!resp.ok) {
@@ -478,9 +439,7 @@ const App = (() => {
         }
       }
 
-      if (payload.camion) {
-        setCamionActual(payload.camion);
-      }
+      if (payload.camion) setCamionActual(payload.camion);
 
       setTimeout(() => mostrarExito(datos, session), 100);
       actualizarProgresoPantalla();
@@ -537,13 +496,11 @@ const App = (() => {
 
     try {
       const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
-
       if (!data.ok) throw new Error("Error");
 
       const eventoActual = modoSeleccionado || "SALIDA_PLANTA";
       const info = EVENTOS[eventoActual];
       const ev = data.eventos[eventoActual];
-
       if (!ev) throw new Error("Evento no encontrado");
 
       const pct = ev.total > 0 ? Math.round((ev.registradas.length / ev.total) * 100) : 0;
@@ -578,9 +535,7 @@ const App = (() => {
       }
 
       if (ev.registradas.length > 0) {
-        html += '<div class="progreso-lista-titulo">';
-        html += '<span>✅ Registradas (' + ev.registradas.length + '):</span>';
-        html += '</div>';
+        html += '<div class="progreso-lista-titulo"><span>✅ Registradas (' + ev.registradas.length + '):</span></div>';
         html += '<div class="progreso-lista">';
         ev.registradas.slice().reverse().forEach(qr => {
           html += '<span class="chip-registrada">✅ ' + qr + '</span>';
@@ -590,9 +545,7 @@ const App = (() => {
 
       const MAX_FALTANTES = 28;
       if (ev.faltantes.length > 0 && !completado) {
-        html += '<div class="progreso-lista-titulo">';
-        html += '<span>⏳ Faltantes (' + ev.faltantes.length + '):</span>';
-        html += '</div>';
+        html += '<div class="progreso-lista-titulo"><span>⏳ Faltantes (' + ev.faltantes.length + '):</span></div>';
         html += '<div class="progreso-lista progreso-lista-faltantes">';
         ev.faltantes.slice(0, MAX_FALTANTES).forEach(qr => {
           html += '<span class="chip-faltante">⏳ ' + qr + '</span>';
@@ -629,9 +582,7 @@ const App = (() => {
     mostrarVista("view-manual");
   }
 
-  function cerrarRegistroManual() {
-    mostrarVista("view-ready");
-  }
+  function cerrarRegistroManual() { mostrarVista("view-ready"); }
 
   async function cargarCatalogoManual() {
     const selectCamion = document.getElementById("manual-camion");
@@ -680,7 +631,6 @@ const App = (() => {
 
   async function registrarEventoManual() {
     const session = getSession();
-
     if (!session || session.rol !== "admin") {
       alert("Sesión inválida. Vuelve a iniciar sesión.");
       return;
@@ -712,20 +662,13 @@ const App = (() => {
         camion: camion,
         po: infoCamion ? infoCamion.po : "",
         cedis: "99" + dc,
-        dc: dc,
-        sabor: sabor,
-        num_tarima: numTarima,
+        dc: dc, sabor: sabor, num_tarima: numTarima,
         evento: evento,
-        usuario: session.user,
-        nombre: session.nombre,
-        rol: session.rol,
+        usuario: session.user, nombre: session.nombre, rol: session.rol,
         notas: "[MANUAL] " + (notas || ""),
       };
 
-      const url = CONFIG.APPS_SCRIPT_URL
-        + "?accion=evento"
-        + "&data=" + encodeURIComponent(JSON.stringify(payload));
-
+      const url = CONFIG.APPS_SCRIPT_URL + "?accion=evento&data=" + encodeURIComponent(JSON.stringify(payload));
       const resp = await jsonp(url);
 
       if (!resp.ok) {
@@ -742,9 +685,7 @@ const App = (() => {
       statusEl.textContent = "✅ Evento registrado correctamente";
       statusEl.className = "send-status ok";
 
-      if (camion === getCamionActual()) {
-        setCamionActual(camion);
-      }
+      if (camion === getCamionActual()) setCamionActual(camion);
 
       document.getElementById("btn-registrar-otro").classList.remove("hidden");
 
@@ -764,7 +705,7 @@ const App = (() => {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // CANCELAR EVENTOS (TARIMAS)
+  // CANCELAR EVENTOS
   // ═══════════════════════════════════════════════════════════
 
   function abrirFormularioCancelar(camion, evento, qrId) {
@@ -806,9 +747,7 @@ const App = (() => {
 
     if (!confirm("¿Confirmas cancelar el evento?\n\nCamión: " + contextoCancelar.camion +
                  "\nEvento: " + contextoCancelar.evento +
-                 "\nTarima: " + contextoCancelar.qrId)) {
-      return;
-    }
+                 "\nTarima: " + contextoCancelar.qrId)) return;
 
     statusEl.textContent = "Cancelando...";
     statusEl.className = "send-status";
@@ -819,15 +758,10 @@ const App = (() => {
         camion: contextoCancelar.camion,
         evento: contextoCancelar.evento,
         motivo: motivo,
-        usuario: session.user,
-        nombre: session.nombre,
-        rol: session.rol,
+        usuario: session.user, nombre: session.nombre, rol: session.rol,
       };
 
-      const url = CONFIG.APPS_SCRIPT_URL
-        + "?accion=cancelar_evento"
-        + "&data=" + encodeURIComponent(JSON.stringify(payload));
-
+      const url = CONFIG.APPS_SCRIPT_URL + "?accion=cancelar_evento&data=" + encodeURIComponent(JSON.stringify(payload));
       const resp = await jsonp(url);
 
       if (!resp.ok) {
@@ -947,9 +881,7 @@ const App = (() => {
 
       const cls = e.completado ? "completado" : "pendiente";
       let faltanTexto = "";
-      if (!e.completado) {
-        faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
-      }
+      if (!e.completado) faltanTexto = '<span class="evento-faltan">(faltan ' + e.faltan + ')</span>';
 
       html += '<div class="evento-linea ' + cls + '">' +
               '<span class="evento-icono">' + info.icono + '</span>' +
@@ -1002,16 +934,9 @@ const App = (() => {
       if (ev === "DEVOLUCION" && e.registradas.length === 0) return;
 
       let status, clase;
-      if (e.completado) {
-        status = "✅ COMPLETADO";
-        clase = "completado";
-      } else if (e.registradas.length > 0) {
-        status = "⏳ FALTAN " + e.faltantes.length;
-        clase = "parcial";
-      } else {
-        status = "⏳ PENDIENTE";
-        clase = "pendiente";
-      }
+      if (e.completado) { status = "✅ COMPLETADO"; clase = "completado"; }
+      else if (e.registradas.length > 0) { status = "⏳ FALTAN " + e.faltantes.length; clase = "parcial"; }
+      else { status = "⏳ PENDIENTE"; clase = "pendiente"; }
 
       html += '<div class="detalle-evento ' + clase + '">';
       html += '<h4>' + info.icono + ' ' + info.etiqueta + '</h4>';
@@ -1029,9 +954,7 @@ const App = (() => {
 
         html += '<ul class="lista-registradas">';
         e.registradas.forEach(qr => {
-          html += '<li>' +
-                  '<span class="qr-texto">' + qr + '</span>';
-
+          html += '<li><span class="qr-texto">' + qr + '</span>';
           if (puedeCancelar) {
             const escQr = qr.replace(/'/g, "\\'");
             const escCamion = data.camion.replace(/'/g, "\\'");
@@ -1039,7 +962,6 @@ const App = (() => {
                     'onclick="event.stopPropagation(); App.abrirFormularioCancelar(\'' +
                     escCamion + '\', \'' + ev + '\', \'' + escQr + '\')">❌ Cancelar</button>';
           }
-
           html += '</li>';
         });
         html += '</ul></details>';
@@ -1072,14 +994,11 @@ const App = (() => {
 })();
 
 // ═══════════════════════════════════════════════════════════════════
-// PEDIDOS - Funciones de PWA (integradas con App)
+// PEDIDOS - Funciones de PWA (MULTI-CEDIS)
 // ═══════════════════════════════════════════════════════════════════
 
 const SKUS_VALIDOS = ["MK150", "MKLM150", "MKCH150"];
 
-/**
- * Formatea números con el formato mexicano: 1,298.45
- */
 function formatearNumero(n, decimales = 2) {
   if (n === null || n === undefined || isNaN(n)) return "—";
   return Number(n).toLocaleString("es-MX", {
@@ -1091,23 +1010,15 @@ function formatearNumero(n, decimales = 2) {
 let pedidoActual = null;
 let skusFormTemporal = [];
 
-/**
- * Obtiene la sesión actual desde localStorage.
- */
 function getSessionGlobal() {
   const s = localStorage.getItem(CONFIG.SESSION_KEY);
   return s ? JSON.parse(s) : null;
 }
 
-/**
- * Muestra una pantalla (login, scanner o pedidos) y oculta las demás.
- */
 function mostrarPantalla(id) {
-  // Ocultar login (si aplica)
   const loginBody = document.querySelector(".login-body");
   if (loginBody) loginBody.style.display = "none";
 
-  // Ocultar vistas del scanner
   ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
    "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
     .forEach(v => {
@@ -1115,44 +1026,28 @@ function mostrarPantalla(id) {
       if (el) el.classList.add("hidden");
     });
 
-  // Ocultar pantallas de pedidos
   ["pantalla-pedidos", "pantalla-form-pedido", "pantalla-detalle-pedido"]
     .forEach(p => {
       const el = document.getElementById(p);
       if (el) el.classList.add("hidden");
     });
 
-  // Mostrar la pantalla solicitada
   const el = document.getElementById(id);
-  if (el) {
-    el.classList.remove("hidden");
-  }
+  if (el) el.classList.remove("hidden");
 }
 
-/**
- * Vuelve al selector de eventos del scanner.
- */
 function volverMenu() {
-  // Ocultar pantallas de pedidos
   ["pantalla-pedidos", "pantalla-form-pedido", "pantalla-detalle-pedido"]
     .forEach(p => {
       const el = document.getElementById(p);
       if (el) el.classList.add("hidden");
     });
 
-  // Mostrar selector del scanner
   const selector = document.getElementById("view-selector");
-  if (selector) {
-    selector.classList.remove("hidden");
-  }
+  if (selector) selector.classList.remove("hidden");
 }
 
-/**
- * Llama al backend con JSONP (para evitar CORS).
- */
-function llamarBackend(url) {
-  return App.jsonp(url);
-}
+function llamarBackend(url) { return App.jsonp(url); }
 
 // ─── Lista de pedidos ───
 
@@ -1181,38 +1076,38 @@ function renderizarListaPedidos(pedidos) {
   for (const p of pedidos) {
     html += `<tr style="border-bottom:1px solid #eee;">
       <td style="padding:8px;">${p.po}</td>
-      <td style="padding:8px;">${p.cedis}</td>
+      <td style="padding:8px;">${(p.cedis || []).join(", ")}</td>
       <td style="padding:8px;">${p.skus.length}</td>
       <td style="padding:8px;">${formatearNumero(p.total_pz, 0)}</td>
-      <td style="padding:8px;"><button onclick="abrirPedido('${p.po}','${p.cedis}')" style="padding:5px 10px;">Ver</button></td>
+      <td style="padding:8px;"><button onclick="abrirPedido('${p.po}')" style="padding:5px 10px;">Ver</button></td>
     </tr>`;
   }
   html += "</tbody></table>";
   cont.innerHTML = html;
 }
 
-function volverListaPedidos() {
-  mostrarListaPedidos();
-}
+function volverListaPedidos() { mostrarListaPedidos(); }
 
 // ─── Formulario ───
 
 function mostrarFormPedido(pedidoExistente = null) {
   skusFormTemporal = [];
   document.getElementById("form-po").value = "";
-  document.getElementById("form-cedis").value = "";
   document.getElementById("form-fecha-entrega").value = "";
   document.getElementById("titulo-form-pedido").textContent = "Nuevo pedido";
   document.getElementById("form-pedido-status").textContent = "";
 
   if (pedidoExistente) {
     document.getElementById("form-po").value = pedidoExistente.po;
-    document.getElementById("form-cedis").value = pedidoExistente.cedis;
     document.getElementById("form-fecha-entrega").value = pedidoExistente.fecha_entrega || "";
     document.getElementById("titulo-form-pedido").textContent = "Editar pedido";
-    skusFormTemporal = pedidoExistente.skus.map(s => ({ sku: s.sku, pz: s.pz }));
+    skusFormTemporal = pedidoExistente.skus.map(s => ({
+      sku: s.sku,
+      cedis: s.cedis,
+      pz: s.pz
+    }));
   } else {
-    skusFormTemporal = [{ sku: "MK150", pz: 0 }];
+    skusFormTemporal = [{ sku: "MK150", cedis: "", pz: 0 }];
   }
 
   renderizarSKUsForm();
@@ -1223,11 +1118,12 @@ function renderizarSKUsForm() {
   const cont = document.getElementById("lista-skus-form");
   let html = "";
   skusFormTemporal.forEach((s, i) => {
-    html += `<div class="fila-sku" style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;">
+    html += `<div class="fila-sku" style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center;">
       <select onchange="cambiarSKU(${i}, this.value)" style="padding:8px;border:1px solid #ccc;border-radius:6px;">
         ${SKUS_VALIDOS.map(sku => `<option value="${sku}" ${sku === s.sku ? "selected" : ""}>${sku}</option>`).join("")}
       </select>
-      <input type="number" inputmode="numeric" value="${s.pz}" onchange="cambiarPZ(${i}, this.value)" style="padding:8px;border:1px solid #ccc;border-radius:6px;">
+      <input type="text" inputmode="numeric" placeholder="CEDIS" value="${s.cedis || ""}" onchange="cambiarCedis(${i}, this.value)" style="padding:8px;border:1px solid #ccc;border-radius:6px;">
+      <input type="number" inputmode="numeric" placeholder="PZ" value="${s.pz}" onchange="cambiarPZ(${i}, this.value)" style="padding:8px;border:1px solid #ccc;border-radius:6px;">
       <button onclick="quitarFilaSKU(${i})" style="padding:8px;background:#FEE2E2;border:1px solid #FECACA;border-radius:6px;">🗑</button>
     </div>`;
   });
@@ -1235,30 +1131,29 @@ function renderizarSKUsForm() {
 }
 
 function agregarFilaSKU() {
-  skusFormTemporal.push({ sku: "MK150", pz: 0 });
+  skusFormTemporal.push({ sku: "MK150", cedis: "", pz: 0 });
   renderizarSKUsForm();
 }
 
 function quitarFilaSKU(i) {
   skusFormTemporal.splice(i, 1);
-  if (skusFormTemporal.length === 0) skusFormTemporal.push({ sku: "MK150", pz: 0 });
+  if (skusFormTemporal.length === 0) skusFormTemporal.push({ sku: "MK150", cedis: "", pz: 0 });
   renderizarSKUsForm();
 }
 
 function cambiarSKU(i, v) { skusFormTemporal[i].sku = v; }
+function cambiarCedis(i, v) { skusFormTemporal[i].cedis = String(v || "").trim().padStart(3, "0"); }
 function cambiarPZ(i, v) { skusFormTemporal[i].pz = Number(v) || 0; }
 
 async function guardarPedidoForm(evt) {
   const po = document.getElementById("form-po").value.trim();
-  const cedis = document.getElementById("form-cedis").value.trim().padStart(3, "0");
   const fecha = document.getElementById("form-fecha-entrega").value;
   const statusEl = document.getElementById("form-pedido-status");
 
   if (!po) return alert("Falta PO");
-  if (!cedis) return alert("Falta CEDIS");
 
-  const skus = skusFormTemporal.filter(s => s.pz > 0);
-  if (skus.length === 0) return alert("Agrega al menos un SKU con cantidad");
+  const skus = skusFormTemporal.filter(s => s.pz > 0 && s.cedis);
+  if (skus.length === 0) return alert("Agrega al menos un SKU con CEDIS y cantidad");
 
   const session = getSessionGlobal();
   if (!session) return alert("Sesión expirada, vuelve a iniciar sesión");
@@ -1270,17 +1165,14 @@ async function guardarPedidoForm(evt) {
 
   const body = {
     po: po,
-    cedis: cedis,
     fecha_entrega: fecha || "",
-    skus: skus,
+    skus: skus.map(s => ({ sku: s.sku, cedis: s.cedis, pz: s.pz })),
     usuario: session.user,
     nombre: session.nombre,
     rol: session.rol
   };
 
-  const url = CONFIG.APPS_SCRIPT_URL
-    + "?accion=guardar_pedido"
-    + "&data=" + encodeURIComponent(JSON.stringify(body));
+  const url = CONFIG.APPS_SCRIPT_URL + "?accion=guardar_pedido&data=" + encodeURIComponent(JSON.stringify(body));
 
   try {
     const resp = await llamarBackend(url);
@@ -1289,7 +1181,7 @@ async function guardarPedidoForm(evt) {
     statusEl.textContent = "✅ Pedido guardado";
     statusEl.className = "send-status ok";
 
-    await abrirPedido(po, cedis);
+    await abrirPedido(po);
   } catch (e) {
     statusEl.textContent = "❌ " + e.message;
     statusEl.className = "send-status error";
@@ -1299,17 +1191,13 @@ async function guardarPedidoForm(evt) {
 
 // ─── Detalle del pedido ───
 
-async function abrirPedido(po, cedis) {
+async function abrirPedido(po) {
   try {
-    const url = CONFIG.APPS_SCRIPT_URL
-      + "?accion=ver_pedido&po=" + encodeURIComponent(po)
-      + "&cedis=" + encodeURIComponent(cedis);
+    const url = CONFIG.APPS_SCRIPT_URL + "?accion=ver_pedido&po=" + encodeURIComponent(po);
     const data = await llamarBackend(url);
     if (!data.ok) throw new Error(data.error || "Pedido no encontrado");
 
     pedidoActual = data;
-
-    // Diagnóstico: imprime en consola la respuesta
     console.log("🔍 Datos recibidos de ver_pedido:", data);
 
     renderizarDetallePedido(data);
@@ -1320,28 +1208,20 @@ async function abrirPedido(po, cedis) {
   }
 }
 
-/**
- * Convierte fechas ISO (2026-01-30T06:00:00.000Z) a formato dd/MM/yyyy HH:mm
- */
 function formatearFecha(valor) {
   if (!valor) return "";
-  
-  // Si ya está en dd/MM/yyyy o dd/MM/yyyy HH:mm
-  if (typeof valor === "string" && /^\d{1,2}\/\d{1,2}\/\d{4}/.test(valor)) {
-    return valor;
-  }
-  
-  // Si es ISO
+  if (typeof valor === "string" && /^\d{1,2}\/\d{1,2}\/\d{4}/.test(valor)) return valor;
+
   try {
     const fecha = new Date(valor);
     if (isNaN(fecha.getTime())) return String(valor);
-    
+
     const dd = String(fecha.getDate()).padStart(2, "0");
     const mm = String(fecha.getMonth() + 1).padStart(2, "0");
     const yyyy = fecha.getFullYear();
     const hh = String(fecha.getHours()).padStart(2, "0");
     const min = String(fecha.getMinutes()).padStart(2, "0");
-    
+
     return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
   } catch (e) {
     return String(valor);
@@ -1350,10 +1230,11 @@ function formatearFecha(valor) {
 
 function renderizarDetallePedido(p) {
   document.getElementById("titulo-detalle-pedido").textContent =
-    "PO " + p.po + " · CEDIS " + p.cedis;
+    "PO " + p.po + " · CEDIS " + (p.cedis || []).join(", ");
 
   document.getElementById("info-pedido").innerHTML = `
     <div class="detalle-info" style="margin:15px 0;padding:10px;background:#f9f9f9;border-radius:8px;">
+      <p><b>CEDIS:</b> ${(p.cedis || []).join(", ")}</p>
       <p><b>SKUs:</b> ${p.skus.length} · <b>Total piezas:</b> ${formatearNumero(p.total_pz, 0)}</p>
       ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
       <p><b>Capturado:</b> ${formatearFecha(p.fecha_captura)} por ${p.usuario}</p>
@@ -1372,7 +1253,6 @@ function renderizarConsolidado(explosion) {
     return;
   }
 
-  // Verificar si el usuario puede editar (Gerencia/Admin)
   const session = getSessionGlobal();
   const puedeEditar = session && ["gerencia", "admin"].includes(String(session.rol || "").toLowerCase());
 
@@ -1385,16 +1265,11 @@ function renderizarConsolidado(explosion) {
 
   html += "<table class='tabla-insumos' id='tabla-insumos'>";
   html += "<thead><tr>";
-  html += "<th>Insumo</th>";
-  html += "<th>Descripción</th>";
-  html += "<th class='col-num'>Necesario</th>";
-  html += "<th class='col-num'>Stock</th>";
-  html += "<th class='col-num'>Faltante</th>";
-  html += "<th class='col-num'>Comprar</th>";
-  html += "<th class='col-num'>PU</th>";
-  html += "<th class='col-num'>IVA</th>";
-  html += "<th class='col-num'>Subtotal</th>";
-  html += "<th class='col-center'>Estado</th>";
+  html += "<th>Insumo</th><th>Descripción</th>";
+  html += "<th class='col-num'>Necesario</th><th class='col-num'>Stock</th>";
+  html += "<th class='col-num'>Faltante</th><th class='col-num'>Comprar</th>";
+  html += "<th class='col-num'>PU</th><th class='col-num'>IVA</th>";
+  html += "<th class='col-num'>Subtotal</th><th class='col-center'>Estado</th>";
   html += "</tr></thead><tbody>";
 
   for (let idx = 0; idx < explosion.length; idx++) {
@@ -1431,16 +1306,10 @@ function renderizarConsolidado(explosion) {
   html += "</tbody></table>";
   cont.innerHTML = html;
 
-  // Guardar copia de la explosión en memoria para editar
   window.explosionActual = explosion.slice();
-
-  // Calcular total general
   recalcularTotalesGenerales();
 }
 
-/**
- * Recalcula el subtotal de una fila y el total general cuando cambia un PU o IVA.
- */
 function onPrecioChange(input) {
   const idx = Number(input.getAttribute("data-idx"));
   const campo = input.getAttribute("data-campo");
@@ -1456,35 +1325,23 @@ function onPrecioChange(input) {
   e.precio_con_iva = Math.round(precioConIva * 100) / 100;
   e.subtotal = Math.round((Number(e.comprar) || 0) * precioConIva * 100) / 100;
 
-  // Actualizar la celda del subtotal
   const subCell = document.querySelector(`[data-subtotal="${idx}"]`);
-  if (subCell) {
-    subCell.textContent = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
-  }
+  if (subCell) subCell.textContent = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
 
-  // Marcar la fila como editada
   const fila = document.querySelector(`tr[data-idx="${idx}"]`);
   if (fila) fila.style.background = "#FFFBEB";
 
   recalcularTotalesGenerales();
 }
 
-/**
- * Recalcula el total general sumando todos los subtotales.
- */
 function recalcularTotalesGenerales() {
   if (!window.explosionActual) return;
   let total = 0;
-  for (const e of window.explosionActual) {
-    total += Number(e.subtotal) || 0;
-  }
+  for (const e of window.explosionActual) total += Number(e.subtotal) || 0;
   const el = document.getElementById("total-general");
   if (el) el.textContent = "$" + formatearNumero(total);
 }
 
-/**
- * Envía los precios editados al backend para guardarlos.
- */
 async function guardarPreciosPedido() {
   if (!pedidoActual) return;
   if (!window.explosionActual) return;
@@ -1495,7 +1352,6 @@ async function guardarPreciosPedido() {
     return;
   }
 
-  // Armar lista de precios
   const precios = window.explosionActual.map(e => ({
     insumo: e.insumo,
     pu: Number(e.pu) || 0,
@@ -1510,9 +1366,7 @@ async function guardarPreciosPedido() {
     rol: session.rol
   };
 
-  const url = CONFIG.APPS_SCRIPT_URL
-    + "?accion=guardar_precios_pedido"
-    + "&data=" + encodeURIComponent(JSON.stringify(body));
+  const url = CONFIG.APPS_SCRIPT_URL + "?accion=guardar_precios_pedido&data=" + encodeURIComponent(JSON.stringify(body));
 
   try {
     const resp = await llamarBackend(url);
@@ -1528,10 +1382,11 @@ function renderizarPorSKU(skus, explosion) {
   let html = "";
   for (const s of skus) {
     html += `<div class="bloque-sku" style="margin-bottom:15px;padding:10px;background:#f9f9f9;border-radius:8px;">
-      <h4 style="margin:0 0 8px 0;">${s.sku} · ${formatearNumero(s.pz, 0)} PZ · ${s.pt_codigo}</h4>
+      <h4 style="margin:0 0 8px 0;">${s.sku} · CEDIS ${s.cedis} · ${formatearNumero(s.pz, 0)} PZ · ${s.pt_codigo}</h4>
       <ul style="margin:0;padding-left:20px;font-size:13px;">`;
     for (const e of explosion) {
-      const porSku = e.por_sku?.find(x => x.pt_codigo === s.sku || x.pt_codigo === s.pt_codigo);
+      const etiquetaSKU = s.sku + " (CEDIS " + s.cedis + ")";
+      const porSku = e.por_sku?.find(x => x.pt_codigo === etiquetaSKU || x.pt_codigo === s.sku);
       if (!porSku) continue;
       const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
       const desc = e.descripcion ? " (" + e.descripcion + ")" : "";
@@ -1562,10 +1417,7 @@ function cambiarTabPedido(tab, evt) {
 
 async function refrescarStock() {
   if (!pedidoActual) return;
-  const url = CONFIG.APPS_SCRIPT_URL
-    + "?accion=refrescar_stock_pedido"
-    + "&po=" + encodeURIComponent(pedidoActual.po)
-    + "&cedis=" + encodeURIComponent(pedidoActual.cedis);
+  const url = CONFIG.APPS_SCRIPT_URL + "?accion=refrescar_stock_pedido&po=" + encodeURIComponent(pedidoActual.po);
 
   try {
     const resp = await llamarBackend(url);
@@ -1593,14 +1445,11 @@ async function eliminarPedidoActual() {
 
   const body = {
     po: pedidoActual.po,
-    cedis: pedidoActual.cedis,
     usuario: session.user,
     rol: session.rol
   };
 
-  const url = CONFIG.APPS_SCRIPT_URL
-    + "?accion=eliminar_pedido"
-    + "&data=" + encodeURIComponent(JSON.stringify(body));
+  const url = CONFIG.APPS_SCRIPT_URL + "?accion=eliminar_pedido&data=" + encodeURIComponent(JSON.stringify(body));
 
   try {
     const resp = await llamarBackend(url);
@@ -1612,14 +1461,6 @@ async function eliminarPedidoActual() {
   }
 }
 
-/**
- * Abre una ventana nueva con la versión imprimible del pedido.
- * El usuario puede imprimir o "Guardar como PDF" desde el navegador.
- */
-/**
- * Abre una ventana nueva con la versión imprimible del pedido.
- * El usuario puede imprimir o "Guardar como PDF" desde el navegador.
- */
 function imprimirPedido() {
   if (!pedidoActual) return;
 
@@ -1680,114 +1521,67 @@ function imprimirPedido() {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Pedido ${p.po}-${p.cedis}</title>
+<title>Pedido ${p.po}</title>
 <style>
   @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    color: #1A202C;
-    padding: 20px;
-    font-size: 11px;
-    background: white;
+    color: #1A202C; padding: 20px; font-size: 11px; background: white;
   }
   .encabezado {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    border-bottom: 3px solid #1F4E79;
-    padding-bottom: 12px;
-    margin-bottom: 15px;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    border-bottom: 3px solid #1F4E79; padding-bottom: 12px; margin-bottom: 15px;
   }
   .encabezado-izq h1 { font-size: 20px; color: #1F4E79; margin-bottom: 4px; }
   .encabezado-izq p { font-size: 12px; color: #4A5568; margin: 2px 0; }
   .encabezado-der { text-align: right; font-size: 11px; color: #4A5568; }
   .resumen {
-    display: flex;
-    gap: 20px;
-    background: #F9FAFB;
-    border: 1px solid #E0E4EA;
-    border-radius: 6px;
-    padding: 10px 15px;
-    margin-bottom: 15px;
-    font-size: 11px;
+    display: flex; gap: 20px; background: #F9FAFB;
+    border: 1px solid #E0E4EA; border-radius: 6px;
+    padding: 10px 15px; margin-bottom: 15px; font-size: 11px;
   }
   .resumen strong { color: #1F4E79; }
   .resumen .st-stock { color: #C00000; font-weight: 700; }
   .resumen .st-parcial { color: #B45309; font-weight: 700; }
   .resumen .st-ok { color: #1F7A1F; font-weight: 700; }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 10px;
-  }
-  thead {
-    background: #1F4E79;
-    color: white;
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  thead { background: #1F4E79; color: white; }
   th {
-    padding: 8px 5px;
-    font-weight: 600;
-    font-size: 9px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    text-align: center;
-    vertical-align: middle;
+    padding: 8px 5px; font-weight: 600; font-size: 9px;
+    text-transform: uppercase; letter-spacing: 0.3px;
+    text-align: center; vertical-align: middle;
   }
-  th:first-child, th:nth-child(2) {
-    text-align: left;
-  }
+  th:first-child, th:nth-child(2) { text-align: left; }
   td {
-    padding: 6px 5px;
-    border-bottom: 1px solid #EEF1F5;
-    vertical-align: middle;
-    text-align: center;
+    padding: 6px 5px; border-bottom: 1px solid #EEF1F5;
+    vertical-align: middle; text-align: center;
   }
-  td:first-child, td:nth-child(2) {
-    text-align: left;
-  }
+  td:first-child, td:nth-child(2) { text-align: left; }
   tr:nth-child(even) { background: #FAFBFD; }
   td.codigo {
     font-family: "Courier New", monospace;
-    font-weight: 700;
-    color: #1F4E79;
+    font-weight: 700; color: #1F4E79;
   }
   td.num {
-    text-align: center;
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+    text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap;
   }
   td.centro { text-align: center; }
   td.comprar { color: #C00000; font-weight: 700; }
   td.subtotal { color: #C00000; font-weight: 700; }
   tr.fila-total {
-    background: #F0F4FA;
-    border-top: 2px solid #1F4E79;
+    background: #F0F4FA; border-top: 2px solid #1F4E79;
   }
-  tr.fila-total td {
-    font-weight: 700;
-    font-size: 11px;
-    padding: 10px 5px;
-  }
+  tr.fila-total td { font-weight: 700; font-size: 11px; padding: 10px 5px; }
   .pie {
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 1px solid #E0E4EA;
-    font-size: 10px;
-    color: #718096;
-    text-align: center;
+    margin-top: 20px; padding-top: 10px;
+    border-top: 1px solid #E0E4EA; font-size: 10px;
+    color: #718096; text-align: center;
   }
   .sin-imprimir {
-    display: block;
-    margin: 0 auto 20px;
-    padding: 10px 20px;
-    background: #1F4E79;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
+    display: block; margin: 0 auto 20px; padding: 10px 20px;
+    background: #1F4E79; color: white; border: none; border-radius: 6px;
+    font-size: 14px; font-weight: 600; cursor: pointer;
   }
   .sin-imprimir:hover { background: #4472C4; }
   @media print {
@@ -1802,7 +1596,7 @@ function imprimirPedido() {
   <div class="encabezado">
     <div class="encabezado-izq">
       <h1>Pedido de Insumos</h1>
-      <p><strong>PO:</strong> ${p.po} &nbsp;·&nbsp; <strong>CEDIS:</strong> ${p.cedis}</p>
+      <p><strong>PO:</strong> ${p.po} &nbsp;·&nbsp; <strong>CEDIS:</strong> ${(p.cedis || []).join(", ")}</p>
       ${p.fecha_entrega ? `<p><strong>Fecha entrega:</strong> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
       <p><strong>Capturado:</strong> ${formatearFecha(p.fecha_captura)} por ${p.usuario || "-"}</p>
       <p><strong>SKUs:</strong> ${(p.skus || []).length} &nbsp;·&nbsp; <strong>Total piezas:</strong> ${formatearNumero(p.total_pz, 0)}</p>
@@ -1823,22 +1617,13 @@ function imprimirPedido() {
   <table>
     <thead>
       <tr>
-        <th>Código</th>
-        <th>Descripción</th>
-        <th>Unidad</th>
-        <th>Necesario</th>
-        <th>Stock</th>
-        <th>Faltante</th>
-        <th>Comprar</th>
-        <th>PU</th>
-        <th>IVA</th>
-        <th>Subtotal</th>
-        <th>Estado</th>
+        <th>Código</th><th>Descripción</th><th>Unidad</th>
+        <th>Necesario</th><th>Stock</th><th>Faltante</th>
+        <th>Comprar</th><th>PU</th><th>IVA</th>
+        <th>Subtotal</th><th>Estado</th>
       </tr>
     </thead>
-    <tbody>
-      ${filasHTML}
-    </tbody>
+    <tbody>${filasHTML}</tbody>
   </table>
 
   <div class="pie">
@@ -1855,4 +1640,3 @@ function imprimirPedido() {
   ventana.document.write(htmlImpresion);
   ventana.document.close();
 }
-
