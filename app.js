@@ -1077,6 +1077,17 @@ const App = (() => {
 
 const SKUS_VALIDOS = ["MK150", "MKLM150", "MKCH150"];
 
+/**
+ * Formatea números con el formato mexicano: 1,298.45
+ */
+function formatearNumero(n, decimales = 2) {
+  if (n === null || n === undefined || isNaN(n)) return "—";
+  return Number(n).toLocaleString("es-MX", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimales
+  });
+}
+
 let pedidoActual = null;
 let skusFormTemporal = [];
 
