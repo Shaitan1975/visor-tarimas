@@ -1349,6 +1349,14 @@ function renderizarDetallePedido(p) {
   cambiarTabPedido("consolidado");
 }
 
+function formatearNumero(n, decimales = 2) {
+  if (n === null || n === undefined || isNaN(n)) return "—";
+  return Number(n).toLocaleString("es-MX", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: decimales
+  });
+}
+
 function renderizarConsolidado(explosion) {
   const cont = document.getElementById("tab-consolidado");
   if (!explosion || explosion.length === 0) {
@@ -1372,17 +1380,16 @@ function renderizarConsolidado(explosion) {
     html += `<tr>
       <td class="col-codigo">${e.insumo}</td>
       <td>${e.descripcion || "—"}</td>
-      <td class="col-num">${e.cantidad_necesaria} ${e.unidad || ""}</td>
-      <td class="col-num">${e.stock_actual}</td>
-      <td class="col-num ${e.faltante > 0 ? 'negativo' : ''}">${e.faltante > 0 ? "+" + e.faltante : e.faltante}</td>
-      <td class="col-num ${comprar > 0 ? 'comprar' : ''}">${comprar > 0 ? comprar + " " + (e.unidad || "") : "—"}</td>
+      <td class="col-num">${formatearNumero(e.cantidad_necesaria)} ${e.unidad || ""}</td>
+      <td class="col-num">${formatearNumero(e.stock_actual)}</td>
+      <td class="col-num ${e.faltante > 0 ? 'negativo' : ''}">${e.faltante > 0 ? "+" + formatearNumero(e.faltante) : formatearNumero(e.faltante)}</td>
+      <td class="col-num ${comprar > 0 ? 'comprar' : ''}">${comprar > 0 ? formatearNumero(comprar) + " " + (e.unidad || "") : "—"}</td>
       <td class="col-center">${icon} ${e.estado}</td>
     </tr>`;
   }
   html += "</tbody></table>";
   cont.innerHTML = html;
 }
-
 function renderizarPorSKU(skus, explosion) {
   const cont = document.getElementById("tab-por-sku");
   let html = "";
@@ -1471,3 +1478,4 @@ async function eliminarPedidoActual() {
     alert("Error al eliminar: " + e.message);
   }
 }
+
