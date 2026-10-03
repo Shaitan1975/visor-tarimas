@@ -1488,3 +1488,222 @@ async function eliminarPedidoActual() {
   }
 }
 
+/**
+ * Abre una ventana nueva con la versión imprimible del pedido.
+ * El usuario puede imprimir o "Guardar como PDF" desde el navegador.
+ */
+function imprimirPedido() {
+  if (!pedidoActual) return;
+
+  const p = pedidoActual;
+  const insumos = p.explosion || [];
+
+  // Ordenar por estado: SIN_STOCK, PARCIAL, OK
+  const orden = { "SIN_STOCK": 0, "PARCIAL": 1, "OK": 2 };
+  const ordenados = insumos.slice().sort((a, b) => {
+    return (orden[a.estado] || 9) - (orden[b.estado] || 9);
+  });
+
+  // Resumen
+  const total = ordenados.length;
+  const sinStock = ordenados.filter(i => i.estado === "SIN_STOCK").length;
+  const parciales = ordenados.filter(i => i.estado === "PARCIAL").length;
+  const oks = ordenados.filter(i => i.estado === "OK").length;
+
+  // Filas de la tabla
+  let filasHTML = "";
+  for (const e of ordenados) {
+    const faltante = Number(e.faltante) || 0;
+    const comprar = Number(e.comprar) || 0;
+    const faltanteTxt = faltante > 0 ? "+" + formatearNumero(faltante) : formatearNumero(faltante);
+    const comprarTxt = comprar > 0 ? formatearNumero(comprar) : "—";
+    const estadoIcon = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
+    const colorEstado = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
+
+    filasHTML += `<tr>
+      <td class="codigo">${e.insumo || ""}</td>
+      <td>${e.descripcion || "—"}</td>
+      <td class="centro">${e.unidad || ""}</td>
+      <td class="num">${formatearNumero(e.cantidad_necesaria)}</td>
+      <td class="num">${formatearNumero(e.stock_actual)}</td>
+      <td class="num">${faltanteTxt}</td>
+      <td class="num comprar">${comprarTxt}</td>
+      <td class="centro" style="color:${colorEstado};font-weight:700;">${estadoIcon}</td>
+    </tr>`;
+  }
+
+  // HTML completo de la hoja de impresión
+  const htmlImpresion = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pedido ${p.po}-${p.cedis}</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: #1A202C;
+    padding: 20px;
+    font-size: 12px;
+    background: white;
+  }
+  .encabezado {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 3px solid #1F4E79;
+    padding-bottom: 12px;
+    margin-bottom: 15px;
+  }
+  .encabezado-izq h1 {
+    font-size: 20px;
+    color: #1F4E79;
+    margin-bottom: 4px;
+  }
+  .encabezado-izq p {
+    font-size: 13px;
+    color: #4A5568;
+    margin: 2px 0;
+  }
+  .encabezado-der {
+    text-align: right;
+    font-size: 11px;
+    color: #4A5568;
+  }
+  .resumen {
+    display: flex;
+    gap: 20px;
+    background: #F9FAFB;
+    border: 1px solid #E0E4EA;
+    border-radius: 6px;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    font-size: 12px;
+  }
+  .resumen strong { color: #1F4E79; }
+  .resumen .st-stock { color: #C00000; font-weight: 700; }
+  .resumen .st-parcial { color: #B45309; font-weight: 700; }
+  .resumen .st-ok { color: #1F7A1F; font-weight: 700; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  thead {
+    background: #1F4E79;
+    color: white;
+  }
+  th {
+    padding: 8px 6px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+  }
+  td {
+    padding: 6px;
+    border-bottom: 1px solid #EEF1F5;
+    vertical-align: middle;
+  }
+  tr:nth-child(even) { background: #FAFBFD; }
+  td.codigo {
+    font-family: "Courier New", monospace;
+    font-weight: 700;
+    color: #1F4E79;
+  }
+  td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  td.centro { text-align: center; }
+  td.comprar {
+    color: #C00000;
+    font-weight: 700;
+  }
+  .pie {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #E0E4EA;
+    font-size: 10px;
+    color: #718096;
+    text-align: center;
+  }
+  .sin-imprimir {
+    display: block;
+    margin: 0 auto 20px;
+    padding: 10px 20px;
+    background: #1F4E79;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .sin-imprimir:hover { background: #4472C4; }
+  @media print {
+    .sin-imprimir { display: none; }
+    body { padding: 0; }
+  }
+</style>
+</head>
+<body>
+  <button class="sin-imprimir" onclick="window.print()">🖨️ Imprimir o Guardar como PDF</button>
+
+  <div class="encabezado">
+    <div class="encabezado-izq">
+      <h1>Pedido de Insumos</h1>
+      <p><strong>PO:</strong> ${p.po} &nbsp;·&nbsp; <strong>CEDIS:</strong> ${p.cedis}</p>
+      ${p.fecha_entrega ? `<p><strong>Fecha entrega:</strong> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
+      <p><strong>Capturado:</strong> ${formatearFecha(p.fecha_captura)} por ${p.usuario || "-"}</p>
+      <p><strong>SKUs:</strong> ${(p.skus || []).length} &nbsp;·&nbsp; <strong>Total piezas:</strong> ${formatearNumero(p.total_pz, 0)}</p>
+    </div>
+    <div class="encabezado-der">
+      <p>Mediese</p>
+      <p>Sistema Visor Tarimas</p>
+    </div>
+  </div>
+
+  <div class="resumen">
+    <div><strong>Total de insumos:</strong> ${total}</div>
+    <div><span class="st-stock">❌ SIN STOCK:</span> ${sinStock}</div>
+    <div><span class="st-parcial">⚠️ PARCIALES:</span> ${parciales}</div>
+    <div><span class="st-ok">✅ OK:</span> ${oks}</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Código</th>
+        <th>Descripción</th>
+        <th class="centro">Unidad</th>
+        <th class="num">Necesario</th>
+        <th class="num">Stock</th>
+        <th class="num">Faltante</th>
+        <th class="num">Comprar</th>
+        <th class="centro">Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filasHTML}
+    </tbody>
+  </table>
+
+  <div class="pie">
+    Generado el ${new Date().toLocaleString("es-MX")} · Sistema Visor Tarimas - Mediese
+  </div>
+</body>
+</html>`;
+
+  // Abrir en ventana nueva
+  const ventana = window.open("", "_blank");
+  if (!ventana) {
+    alert("El navegador bloqueó la ventana emergente. Permite ventanas para este sitio e intenta de nuevo.");
+    return;
+  }
+  ventana.document.write(htmlImpresion);
+  ventana.document.close();
+}
