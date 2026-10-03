@@ -1098,9 +1098,37 @@ async function guardarPedidoForm(evt) {
   try {
     const resp = await llamarBackend(url);
     if (!resp.ok) throw new Error(resp.error || "Error desconocido");
+
     statusEl.textContent = "✅ Pedido guardado";
     statusEl.className = "send-status ok";
-    await abrirPedido(po);
+
+    // 🔥 FIX: usamos la respuesta del guardado (ya trae la explosión)
+    pedidoActual = {
+      ok: true,
+      id_pedido: resp.id_pedido,
+      po: po,
+      cedis: resp.cedis || [],
+      fecha_entrega: fecha,
+      fecha_captura: new Date().toLocaleString("es-MX"),
+      usuario: session.user,
+      estado_pedido: "PENDIENTE",
+      pz_pedidas_total: skus.reduce((s, k) => s + k.pz, 0),
+      pz_surtidas_total: 0,
+      pz_pendientes_total: skus.reduce((s, k) => s + k.pz, 0),
+      skus: (resp.skus || []).map(s => ({
+        sku: s.sku, cedis: s.cedis, pt_codigo: s.pt_codigo, pz: s.pz
+      })),
+      total_pz: skus.reduce((s, k) => s + k.pz, 0),
+      explosion: resp.explosion || []
+    };
+
+    // Renderizar directamente con lo que nos devolvió el backend
+    renderizarDetallePedido(pedidoActual);
+    mostrarPantalla("pantalla-detalle-pedido");
+
+    // Restaurar botón por si regresan a editar
+    if (btn) { btn.disabled = false; btn.textContent = "✅ Guardar y calcular"; }
+
   } catch (e) {
     statusEl.textContent = "❌ " + e.message;
     statusEl.className = "send-status error";
