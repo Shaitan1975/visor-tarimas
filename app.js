@@ -1380,11 +1380,23 @@ function renderizarConsolidado(explosion) {
   html += "<th class='col-num'>Stock</th>";
   html += "<th class='col-num'>Faltante</th>";
   html += "<th class='col-num'>Comprar</th>";
+  html += "<th class='col-num'>PU</th>";
+  html += "<th class='col-num'>IVA</th>";
+  html += "<th class='col-num'>Subtotal</th>";
   html += "<th class='col-center'>Estado</th>";
   html += "</tr></thead><tbody>";
+
+  let subtotalGral = 0;
+
   for (const e of explosion) {
     const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
     const comprar = e.comprar && e.comprar > 0 ? e.comprar : (e.faltante > 0 ? e.faltante : 0);
+    const pu = Number(e.pu || 0);
+    const ivaUnit = Number(e.iva_tasa || 0);
+    const sub = Number(e.subtotal || 0);
+
+    subtotalGral += sub;
+
     html += `<tr>
       <td class="col-codigo">${e.insumo}</td>
       <td>${e.descripcion || "—"}</td>
@@ -1392,9 +1404,19 @@ function renderizarConsolidado(explosion) {
       <td class="col-num">${formatearNumero(e.stock_actual)}</td>
       <td class="col-num ${e.faltante > 0 ? 'negativo' : ''}">${e.faltante > 0 ? "+" + formatearNumero(e.faltante) : formatearNumero(e.faltante)}</td>
       <td class="col-num ${comprar > 0 ? 'comprar' : ''}">${comprar > 0 ? formatearNumero(comprar) + " " + (e.unidad || "") : "—"}</td>
+      <td class="col-num">${pu > 0 ? "$" + formatearNumero(pu) : "—"}</td>
+      <td class="col-num">${ivaUnit > 0 ? "$" + formatearNumero(ivaUnit) : "—"}</td>
+      <td class="col-num total">${sub > 0 ? "$" + formatearNumero(sub) : "—"}</td>
       <td class="col-center">${icon} ${e.estado}</td>
     </tr>`;
   }
+
+  html += `<tr class="fila-totales">
+    <td colspan="8" style="text-align:right;font-weight:700;">TOTAL A COMPRAR:</td>
+    <td class="col-num total" style="font-weight:700;">$${formatearNumero(subtotalGral)}</td>
+    <td></td>
+  </tr>`;
+
   html += "</tbody></table>";
   cont.innerHTML = html;
 }
