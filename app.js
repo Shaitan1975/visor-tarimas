@@ -1328,24 +1328,27 @@ function renderizarConsolidado(explosion) {
     return;
   }
 
-  let html = "<table style='width:100%;border-collapse:collapse;font-size:13px;'>";
-  html += "<thead><tr style='background:#f2f2f2;'>";
-  html += "<th style='padding:8px;text-align:left;'>Insumo</th>";
-  html += "<th style='padding:8px;text-align:left;'>Descripción</th>";
-  html += "<th style='padding:8px;'>Necesario</th>";
-  html += "<th style='padding:8px;'>Stock</th>";
-  html += "<th style='padding:8px;'>Faltante</th>";
-  html += "<th style='padding:8px;'>Estado</th>";
+  let html = "<table class='tabla-insumos'>";
+  html += "<thead><tr>";
+  html += "<th>Insumo</th>";
+  html += "<th>Descripción</th>";
+  html += "<th class='col-num'>Necesario</th>";
+  html += "<th class='col-num'>Stock</th>";
+  html += "<th class='col-num'>Faltante</th>";
+  html += "<th class='col-num'>Comprar</th>";
+  html += "<th class='col-center'>Estado</th>";
   html += "</tr></thead><tbody>";
   for (const e of explosion) {
     const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
-    html += `<tr style="border-bottom:1px solid #eee;">
-      <td style="padding:8px;font-family:monospace;font-size:12px;">${e.insumo}</td>
-      <td style="padding:8px;">${e.descripcion || "—"}</td>
-      <td style="padding:8px;text-align:right;">${e.cantidad_necesaria} ${e.unidad}</td>
-      <td style="padding:8px;text-align:right;">${e.stock_actual}</td>
-      <td style="padding:8px;text-align:right;">${e.faltante > 0 ? "+" + e.faltante : e.faltante}</td>
-      <td style="padding:8px;text-align:center;">${icon} ${e.estado}</td>
+    const comprar = e.faltante > 0 ? e.faltante : 0;
+    html += `<tr>
+      <td class="col-codigo">${e.insumo}</td>
+      <td>${e.descripcion || "—"}</td>
+      <td class="col-num">${e.cantidad_necesaria} ${e.unidad || ""}</td>
+      <td class="col-num">${e.stock_actual}</td>
+      <td class="col-num ${e.faltante > 0 ? 'negativo' : ''}">${e.faltante > 0 ? "+" + e.faltante : e.faltante}</td>
+      <td class="col-num ${comprar > 0 ? 'comprar' : ''}">${comprar > 0 ? comprar + " " + (e.unidad || "") : "—"}</td>
+      <td class="col-center">${icon} ${e.estado}</td>
     </tr>`;
   }
   html += "</tbody></table>";
