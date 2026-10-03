@@ -1169,3 +1169,62 @@ details summary {
 #pantalla-form-pedido .btn-secondary {
   width: 100%;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PEDIDOS - Formulario multi-CEDIS (fix de desborde)
+   ═══════════════════════════════════════════════════════════════ */
+
+#pantalla-form-pedido .manual-container {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 20px 16px;
+}
+
+#pantalla-form-pedido input,
+#pantalla-form-pedido select,
+#pantalla-form-pedido button {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+#lista-skus-form {
+  width: 100%;
+  overflow: hidden;
+}
+
+#pantalla-form-pedido .btn-secondary {
+  width: 100%;
+}
+
+/* Tabla de insumos - permitir scroll horizontal en móvil */
+.tabla-insumos {
+  width: 100%;
+  overflow-x: auto;
+  display: block;
+  font-size: 11px;
+}
+
+.tabla-insumos thead,
+.tabla-insumos tbody,
+.tabla-insumos tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.tabla-insumos th,
+.tabla-insumos td {
+  padding: 4px 3px !important;
+  font-size: 10px !important;
+  word-break: break-word;
+}
+
+/* Badge de estado del pedido */
+.estado-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 12px;
+}
