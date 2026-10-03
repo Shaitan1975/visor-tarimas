@@ -6,7 +6,6 @@
 <meta name="theme-color" content="#1F4E79">
 <title>Visor Tarimas - Escanear</title>
 
-<!-- ⚠️ FAVICON -->
 <link rel="icon" type="image/png" sizes="192x192" href="./icono_192x192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="./icono_512x512.png">
 <link rel="shortcut icon" type="image/png" href="./icono_192x192.png">
@@ -58,10 +57,8 @@
       <p id="ready-descripcion">Toca el botón para activar la cámara.</p>
       <button id="btn-start-scan" class="btn-primary btn-large">🎥 Escanear QR</button>
 
-      <!-- Panel de progreso del camión actual -->
       <div id="progreso-camion" class="progreso-camion hidden"></div>
 
-      <!-- Botón para limpiar el progreso manualmente -->
       <button id="btn-limpiar-progreso" class="btn-limpiar-progreso hidden">
         ✖ Cerrar progreso del camión actual
       </button>
@@ -69,7 +66,6 @@
       <button id="btn-cambiar-evento" class="btn-secondary hidden">🔄 Cambiar evento</button>
       <button id="btn-ver-estatus" class="btn-secondary">📊 Ver estatus de camiones</button>
 
-      <!-- Botón de Registro Manual (solo admin) - OCULTO POR DEFECTO -->
       <button id="btn-registro-manual" class="btn-secondary hidden" style="margin-top: 10px; background: #FFF7ED; color: #9A3412; border-color: #FED7AA;">
         📝 Registro Manual (Admin)
       </button>
@@ -126,54 +122,25 @@
     </div>
 
     <div class="result-meta">
-      <div class="meta-item">
-        <span class="meta-label">Evento</span>
-        <span class="meta-value" id="meta-evento">-</span>
-      </div>
-      <div class="meta-item">
-        <span class="meta-label">Ubicación</span>
-        <span class="meta-value" id="meta-ubicacion">-</span>
-      </div>
-      <div class="meta-item">
-        <span class="meta-label">Fecha/Hora</span>
-        <span class="meta-value" id="meta-fecha">-</span>
-      </div>
+      <div class="meta-item"><span class="meta-label">Evento</span><span class="meta-value" id="meta-evento">-</span></div>
+      <div class="meta-item"><span class="meta-label">Ubicación</span><span class="meta-value" id="meta-ubicacion">-</span></div>
+      <div class="meta-item"><span class="meta-label">Fecha/Hora</span><span class="meta-value" id="meta-fecha">-</span></div>
     </div>
 
     <div class="result-meta">
-      <div class="meta-item">
-        <span class="meta-label">Camión</span>
-        <span class="meta-value" id="meta-camion">-</span>
-      </div>
-      <div class="meta-item">
-        <span class="meta-label">DC</span>
-        <span class="meta-value" id="meta-dc">-</span>
-      </div>
-      <div class="meta-item">
-        <span class="meta-label">Sabor</span>
-        <span class="meta-value" id="meta-sabor">-</span>
-      </div>
+      <div class="meta-item"><span class="meta-label">Camión</span><span class="meta-value" id="meta-camion">-</span></div>
+      <div class="meta-item"><span class="meta-label">DC</span><span class="meta-value" id="meta-dc">-</span></div>
+      <div class="meta-item"><span class="meta-label">Sabor</span><span class="meta-value" id="meta-sabor">-</span></div>
     </div>
 
     <div class="result-meta">
-      <div class="meta-item">
-        <span class="meta-label">Lote</span>
-        <span class="meta-value" id="meta-lote">-</span>
-      </div>
-      <div class="meta-item">
-        <span class="meta-label"># Tarima</span>
-        <span class="meta-value" id="meta-tarima">-</span>
-      </div>
-      <div class="meta-item">
-        <span class="meta-label">PO</span>
-        <span class="meta-value" id="meta-po">-</span>
-      </div>
+      <div class="meta-item"><span class="meta-label">Lote</span><span class="meta-value" id="meta-lote">-</span></div>
+      <div class="meta-item"><span class="meta-label"># Tarima</span><span class="meta-value" id="meta-tarima">-</span></div>
+      <div class="meta-item"><span class="meta-label">PO</span><span class="meta-value" id="meta-po">-</span></div>
     </div>
 
     <div class="result-actions">
-      <button id="btn-scan-again" class="btn-primary btn-large">
-        🔄 Escanear otra tarima
-      </button>
+      <button id="btn-scan-again" class="btn-primary btn-large">🔄 Escanear otra tarima</button>
     </div>
 
     <p id="send-status" class="send-status"></p>
@@ -187,15 +154,11 @@
         <button id="btn-cerrar-manual" class="btn-cerrar">✖</button>
       </div>
 
-      <p class="manual-descripcion">
-        Registra eventos manualmente. Solo usuarios administradores.
-      </p>
+      <p class="manual-descripcion">Registra eventos manualmente. Solo usuarios administradores.</p>
 
       <div class="input-group">
         <label for="manual-camion">Camión</label>
-        <select id="manual-camion" class="manual-select">
-          <option value="">-- Selecciona un camión --</option>
-        </select>
+        <select id="manual-camion" class="manual-select"><option value="">-- Selecciona un camión --</option></select>
       </div>
 
       <div class="input-group">
@@ -212,9 +175,7 @@
 
       <div class="input-group">
         <label for="manual-tarima">QR / Tarima</label>
-        <select id="manual-tarima" class="manual-select">
-          <option value="">-- Primero selecciona un camión --</option>
-        </select>
+        <select id="manual-tarima" class="manual-select"><option value="">-- Primero selecciona un camión --</option></select>
       </div>
 
       <div class="input-group">
@@ -224,12 +185,8 @@
 
       <p id="manual-registro-status" class="send-status"></p>
 
-      <button id="btn-registrar-manual" class="btn-primary btn-large">
-        ✅ Registrar Evento
-      </button>
-      <button id="btn-registrar-otro" class="btn-secondary hidden">
-        🔄 Registrar otro
-      </button>
+      <button id="btn-registrar-manual" class="btn-primary btn-large">✅ Registrar Evento</button>
+      <button id="btn-registrar-otro" class="btn-secondary hidden">🔄 Registrar otro</button>
     </div>
   </section>
 
@@ -241,9 +198,7 @@
         <button id="btn-cerrar-cancelar" class="btn-cerrar">✖</button>
       </div>
 
-      <p class="manual-descripcion">
-        Confirma los datos del evento a cancelar. Se marcará como CANCELADO y ya no contará en los totales.
-      </p>
+      <p class="manual-descripcion">Confirma los datos del evento a cancelar. Se marcará como CANCELADO y ya no contará en los totales.</p>
 
       <div class="detalle-info" style="margin-bottom: 15px;">
         <p><b>Camión:</b> <span id="cancelar-info-camion">-</span></p>
@@ -265,7 +220,7 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════════════
-       PEDIDOS - Pantallas (MULTI-CEDIS)
+       PEDIDOS
        ═══════════════════════════════════════════════════════════════ -->
 
   <!-- PANTALLA: Lista de Pedidos -->
@@ -284,40 +239,40 @@
     </div>
   </section>
 
-  <!-- PANTALLA: Formulario de pedido (MULTI-CEDIS) -->
-<section id="pantalla-form-pedido" class="view-section hidden">
-  <div class="manual-container">
-    <div class="estatus-header">
-      <h2 id="titulo-form-pedido">Nuevo pedido</h2>
-      <button onclick="volverListaPedidos()" class="btn-cerrar">✖</button>
+  <!-- PANTALLA: Formulario de pedido -->
+  <section id="pantalla-form-pedido" class="view-section hidden">
+    <div class="manual-container">
+      <div class="estatus-header">
+        <h2 id="titulo-form-pedido">Nuevo pedido</h2>
+        <button onclick="volverListaPedidos()" class="btn-cerrar">✖</button>
+      </div>
+
+      <p class="manual-descripcion">
+        Puedes agregar varios CEDIS en un mismo pedido. Cada línea (SKU) lleva su propio CEDIS.
+      </p>
+
+      <div class="input-group">
+        <label for="form-po">PO</label>
+        <input type="text" id="form-po" placeholder="14203817" inputmode="numeric">
+      </div>
+
+      <div class="input-group">
+        <label for="form-fecha-entrega">Fecha de entrega (opcional)</label>
+        <input type="date" id="form-fecha-entrega">
+      </div>
+
+      <h3 style="margin-top:20px;">SKUs</h3>
+      <div id="lista-skus-form"></div>
+      <button class="btn-secondary" onclick="agregarFilaSKU()" style="margin-top:8px;width:100%;">+ Agregar SKU</button>
+
+      <p id="form-pedido-status" class="send-status"></p>
+
+      <button class="btn-primary btn-large" onclick="guardarPedidoForm(event)" style="margin-top:15px;">
+        ✅ Guardar y calcular
+      </button>
     </div>
+  </section>
 
-    <p class="manual-descripcion">
-      Puedes agregar varios CEDIS en un mismo pedido. Cada línea (SKU) lleva su propio CEDIS.
-    </p>
-
-    <div class="input-group">
-      <label for="form-po">PO</label>
-      <input type="text" id="form-po" placeholder="14203817" inputmode="numeric">
-    </div>
-
-    <div class="input-group">
-      <label for="form-fecha-entrega">Fecha de entrega (opcional)</label>
-      <input type="date" id="form-fecha-entrega">
-    </div>
-
-    <h3 style="margin-top:20px;">SKUs</h3>
-    <div id="lista-skus-form"></div>
-    <button class="btn-secondary" onclick="agregarFilaSKU()" style="margin-top:8px;width:100%;">+ Agregar SKU</button>
-
-    <p id="form-pedido-status" class="send-status"></p>
-
-    <button class="btn-primary btn-large" onclick="guardarPedidoForm(event)" style="margin-top:15px;">
-      ✅ Guardar y calcular
-    </button>
-  </div>
-</section>
-  
   <!-- PANTALLA: Detalle del pedido -->
   <section id="pantalla-detalle-pedido" class="view-section hidden">
     <div class="estatus-container">
@@ -340,6 +295,9 @@
         <button class="btn-primary" onclick="imprimirPedido()" style="background:#1F4E79;">🖨️ Imprimir / PDF</button>
         <button class="btn-secondary" onclick="refrescarStock()">🔄 Actualizar stock</button>
         <button class="btn-secondary" onclick="editarPedidoActual()">✏️ Editar</button>
+        <button class="btn-secondary" onclick="marcarPedidoSurtido('SURTIDO')" style="background:#DCFCE7;color:#166534;border-color:#BBF7D0;">✅ Marcar surtido</button>
+        <button class="btn-secondary" onclick="marcarPedidoSurtido('PENDIENTE')" style="background:#FEF3C7;color:#92400E;border-color:#FDE68A;">↩ Reabrir pedido</button>
+        <button class="btn-secondary" onclick="verMovimientosPedido()">📜 Ver movimientos</button>
         <button class="btn-secondary" style="background:#FEE2E2;color:#991B1B;border-color:#FECACA;" onclick="eliminarPedidoActual()">🗑 Eliminar</button>
       </div>
     </div>
