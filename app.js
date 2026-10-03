@@ -1308,9 +1308,14 @@ async function abrirPedido(po, cedis) {
     if (!data.ok) throw new Error(data.error || "Pedido no encontrado");
 
     pedidoActual = data;
+
+    // Diagnóstico: imprime en consola la respuesta
+    console.log("🔍 Datos recibidos de ver_pedido:", data);
+
     renderizarDetallePedido(data);
     mostrarPantalla("pantalla-detalle-pedido");
   } catch (e) {
+    console.error("❌ Error al abrir pedido:", e);
     alert("Error al abrir pedido: " + e.message);
   }
 }
