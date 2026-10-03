@@ -1372,7 +1372,18 @@ function renderizarConsolidado(explosion) {
     return;
   }
 
-  let html = "<table class='tabla-insumos'>";
+  // Verificar si el usuario puede editar (Gerencia/Admin)
+  const session = getSessionGlobal();
+  const puedeEditar = session && ["gerencia", "admin"].includes(session.rol);
+
+  let html = "<div style='margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;'>";
+  html += `<div><b>Total a comprar:</b> <span id="total-general" style="font-size:20px;color:#1F4E79;font-weight:700;">$0.00</span></div>`;
+  if (puedeEditar) {
+    html += `<button onclick="guardarPreciosPedido()" style="padding:8px 16px;background:#1F4E79;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;">💾 Guardar precios</button>`;
+  }
+  html += "</div>";
+
+  html += "<table class='tabla-insumos' id='tabla-insumos'>";
   html += "<thead><tr>";
   html += "<th>Insumo</th>";
   html += "<th>Descripción</th>";
@@ -1386,39 +1397,130 @@ function renderizarConsolidado(explosion) {
   html += "<th class='col-center'>Estado</th>";
   html += "</tr></thead><tbody>";
 
-  let subtotalGral = 0;
-
-  for (const e of explosion) {
+  for (let idx = 0; idx < explosion.length; idx++) {
+    const e = explosion[idx];
     const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
-    const comprar = e.comprar && e.comprar > 0 ? e.comprar : (e.faltante > 0 ? e.faltante : 0);
+    const comprar = e.comprar || 0;
     const pu = Number(e.pu || 0);
     const ivaUnit = Number(e.iva_tasa || 0);
     const sub = Number(e.subtotal || 0);
+    const editado = e.editado ? " style='background:#FFFBEB;'" : "";
 
-    subtotalGral += sub;
+    const inputStyle = "width:80px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;text-align:right;font-size:12px;";
+    const inputPU = puedeEditar
+      ? `<input type="number" step="0.01" min="0" value="${pu}" data-idx="${idx}" data-campo="pu" onchange="onPrecioChange(this)" style="${inputStyle}">`
+      : `<span>${pu > 0 ? "$" + formatearNumero(pu) : "—"}</span>`;
+    const inputIVA = puedeEditar
+      ? `<input type="number" step="0.01" min="0" value="${ivaUnit}" data-idx="${idx}" data-campo="iva" onchange="onPrecioChange(this)" style="${inputStyle}">`
+      : `<span>${ivaUnit > 0 ? "$" + formatearNumero(ivaUnit) : "—"}</span>`;
 
-    html += `<tr>
+    html += `<tr data-idx="${idx}"${editado}>
       <td class="col-codigo">${e.insumo}</td>
       <td>${e.descripcion || "—"}</td>
       <td class="col-num">${formatearNumero(e.cantidad_necesaria)} ${e.unidad || ""}</td>
       <td class="col-num">${formatearNumero(e.stock_actual)}</td>
       <td class="col-num ${e.faltante > 0 ? 'negativo' : ''}">${e.faltante > 0 ? "+" + formatearNumero(e.faltante) : formatearNumero(e.faltante)}</td>
       <td class="col-num ${comprar > 0 ? 'comprar' : ''}">${comprar > 0 ? formatearNumero(comprar) + " " + (e.unidad || "") : "—"}</td>
-      <td class="col-num">${pu > 0 ? "$" + formatearNumero(pu) : "—"}</td>
-      <td class="col-num">${ivaUnit > 0 ? "$" + formatearNumero(ivaUnit) : "—"}</td>
-      <td class="col-num total">${sub > 0 ? "$" + formatearNumero(sub) : "—"}</td>
+      <td class="col-num">${inputPU}</td>
+      <td class="col-num">${inputIVA}</td>
+      <td class="col-num total" data-subtotal="${idx}">${sub > 0 ? "$" + formatearNumero(sub) : "—"}</td>
       <td class="col-center">${icon} ${e.estado}</td>
     </tr>`;
   }
 
-  html += `<tr class="fila-totales">
-    <td colspan="8" style="text-align:right;font-weight:700;">TOTAL A COMPRAR:</td>
-    <td class="col-num total" style="font-weight:700;">$${formatearNumero(subtotalGral)}</td>
-    <td></td>
-  </tr>`;
-
   html += "</tbody></table>";
   cont.innerHTML = html;
+
+  // Calcular total general
+  recalcularTotalesGenerales();
+
+  // Guardar copia de la explosión en memoria
+  window.explosionActual = explosion.slice();
+}
+
+/**
+ * Recalcula el subtotal de una fila y el total general cuando cambia un PU o IVA.
+ */
+function onPrecioChange(input) {
+  const idx = Number(input.getAttribute("data-idx"));
+  const campo = input.getAttribute("data-campo");
+  const valor = Number(input.value) || 0;
+
+  if (!window.explosionActual || !window.explosionActual[idx]) return;
+  const e = window.explosionActual[idx];
+
+  if (campo === "pu") e.pu = valor;
+  if (campo === "iva") e.iva_tasa = valor;
+
+  const precioConIva = (Number(e.pu) || 0) + (Number(e.iva_tasa) || 0);
+  e.precio_con_iva = Math.round(precioConIva * 100) / 100;
+  e.subtotal = Math.round((Number(e.comprar) || 0) * precioConIva * 100) / 100;
+
+  // Actualizar la celda del subtotal
+  const subCell = document.querySelector(`[data-subtotal="${idx}"]`);
+  if (subCell) {
+    subCell.textContent = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
+  }
+
+  // Marcar la fila como editada
+  const fila = document.querySelector(`tr[data-idx="${idx}"]`);
+  if (fila) fila.style.background = "#FFFBEB";
+
+  recalcularTotalesGenerales();
+}
+
+/**
+ * Recalcula el total general sumando todos los subtotales.
+ */
+function recalcularTotalesGenerales() {
+  if (!window.explosionActual) return;
+  let total = 0;
+  for (const e of window.explosionActual) {
+    total += Number(e.subtotal) || 0;
+  }
+  const el = document.getElementById("total-general");
+  if (el) el.textContent = "$" + formatearNumero(total);
+}
+
+/**
+ * Envía los precios editados al backend para guardarlos.
+ */
+async function guardarPreciosPedido() {
+  if (!pedidoActual) return;
+  if (!window.explosionActual) return;
+
+  const session = getSessionGlobal();
+  if (!session || !["gerencia", "admin"].includes(session.rol)) {
+    alert("Solo Gerencia y Admin pueden guardar precios");
+    return;
+  }
+
+  // Armar lista de precios
+  const precios = window.explosionActual.map(e => ({
+    insumo: e.insumo,
+    pu: Number(e.pu) || 0,
+    iva: Number(e.iva_tasa) || 0
+  }));
+
+  const body = {
+    accion: "guardar_precios_pedido",
+    id_pedido: pedidoActual.id_pedido,
+    precios: precios,
+    usuario: session.user,
+    rol: session.rol
+  };
+
+  const url = CONFIG.APPS_SCRIPT_URL
+    + "?accion=guardar_precios_pedido"
+    + "&data=" + encodeURIComponent(JSON.stringify(body));
+
+  try {
+    const resp = await llamarBackend(url);
+    if (!resp.ok) throw new Error(resp.error || "Error desconocido");
+    alert("✅ " + (resp.mensaje || "Precios guardados"));
+  } catch (e) {
+    alert("❌ Error al guardar: " + e.message);
+  }
 }
 
 function renderizarPorSKU(skus, explosion) {
