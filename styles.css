@@ -942,3 +942,58 @@ details summary {
 .info-pedido { background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
 .bloque-sku { margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 5px; }
 .acciones-detalle { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+
+/* ═══════════════════════════════════════════
+   PEDIDOS
+   ═══════════════════════════════════════════ */
+
+.lista-pedidos table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.lista-pedidos th {
+  background: #f2f2f2;
+  padding: 10px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.lista-pedidos td {
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.lista-pedidos button {
+  padding: 6px 12px;
+  background: #1F4E79;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.tab {
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  background: white;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.tab.activo {
+  background: #1F4E79;
+  color: white;
+  border-color: #1F4E79;
+}
+
+.tab-contenido {
+  margin-top: 15px;
+}
+
+.fila-sku select,
+.fila-sku input {
+  font-size: 15px;
+}
