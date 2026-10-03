@@ -1349,14 +1349,6 @@ function renderizarDetallePedido(p) {
   cambiarTabPedido("consolidado");
 }
 
-function formatearNumero(n, decimales = 2) {
-  if (n === null || n === undefined || isNaN(n)) return "—";
-  return Number(n).toLocaleString("es-MX", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: decimales
-  });
-}
-
 function renderizarConsolidado(explosion) {
   const cont = document.getElementById("tab-consolidado");
   if (!explosion || explosion.length === 0) {
