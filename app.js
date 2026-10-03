@@ -1404,7 +1404,7 @@ function renderizarPorSKU(skus, explosion) {
   let html = "";
   for (const s of skus) {
     html += `<div class="bloque-sku" style="margin-bottom:15px;padding:10px;background:#f9f9f9;border-radius:8px;">
-      <h4 style="margin:0 0 8px 0;">${s.sku} · ${formatearNumero(p.total_pz, 0)} PZ · ${s.pt_codigo}</h4>
+      <h4 style="margin:0 0 8px 0;">${s.sku} · ${formatearNumero(s.pz, 0)} PZ · ${s.pt_codigo}</h4>
       <ul style="margin:0;padding-left:20px;font-size:13px;">`;
     for (const e of explosion) {
       const porSku = e.por_sku?.find(x => x.pt_codigo === s.sku || x.pt_codigo === s.pt_codigo);
