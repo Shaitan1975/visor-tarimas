@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v27)
-// Multi-CEDIS + Secuencial + Auto-procesado + Manual
+// VISOR TARIMAS - LÓGICA DE LA PWA (v28)
+// Multi-CEDIS + Cálculo por PO (salidas de EVENTOS) + FIFO
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
@@ -29,10 +29,6 @@ const MAPA_LUGARES = {
 };
 
 const SKUS_VALIDOS = ["MK150", "MKLM150", "MKCH150"];
-
-// ═══════════════════════════════════════════════════════════════════
-// APP PRINCIPAL
-// ═══════════════════════════════════════════════════════════════════
 
 const App = (() => {
 
@@ -82,10 +78,7 @@ const App = (() => {
         };
       }
       return null;
-    } catch (e) {
-      console.error("Error al verificar usuario:", e);
-      return null;
-    }
+    } catch (e) { return null; }
   }
 
   function descifrarBlobQR(blobB64, password) {
@@ -258,10 +251,9 @@ const App = (() => {
       mostrarVista("view-ready");
       return;
     }
-
     const eventos = session.eventos_permitidos || ["SALIDA_PLANTA"];
     if (eventos.length === 0) {
-      alert("Tu usuario no tiene eventos asignados. Contacta al administrador.");
+      alert("Tu usuario no tiene eventos asignados.");
       clearSession();
       window.location.href = "index.html";
       return;
@@ -304,7 +296,6 @@ const App = (() => {
       });
       contenedor.appendChild(btn);
     });
-
     document.getElementById("view-selector").classList.remove("hidden");
   }
 
@@ -312,7 +303,6 @@ const App = (() => {
     const banner = document.getElementById("modo-indicador");
     const texto = document.getElementById("modo-texto");
     const icono = document.getElementById("modo-icono");
-
     if (banner) banner.style.display = "flex";
     if (texto) texto.textContent = info.etiqueta;
     if (icono) icono.textContent = info.icono;
@@ -327,7 +317,6 @@ const App = (() => {
         btnCambiar.classList.add("hidden");
       }
     }
-
     const readyTitulo = document.getElementById("ready-titulo");
     const readyDesc = document.getElementById("ready-descripcion");
     if (readyTitulo) readyTitulo.textContent = info.etiqueta;
@@ -342,7 +331,6 @@ const App = (() => {
         if (el) el.classList.add("hidden");
       });
     document.getElementById(id).classList.remove("hidden");
-
     if (id === "view-ready") actualizarProgresoPantalla();
   }
 
@@ -438,16 +426,6 @@ const App = (() => {
       }
 
       if (payload.camion) setCamionActual(payload.camion);
-
-      // Si hubo auto-procesado, mostrar info
-      if (resp.procesado_auto && resp.procesado_auto.ok && resp.procesado_auto.piezas_aplicadas > 0) {
-        setTimeout(() => {
-          alert("✅ Pedido " + resp.procesado_auto.id_pedido + " actualizado\n" +
-                "Piezas aplicadas: " + resp.procesado_auto.piezas_aplicadas + "\n" +
-                "Nuevo estado: " + resp.procesado_auto.estado);
-        }, 200);
-      }
-
       setTimeout(() => mostrarExito(datos, session), 100);
       actualizarProgresoPantalla();
 
@@ -486,7 +464,6 @@ const App = (() => {
     const camion = getCamionActual();
     const contenedor = document.getElementById("progreso-camion");
     const btnLimpiar = document.getElementById("btn-limpiar-progreso");
-
     if (!contenedor) return;
 
     if (!camion) {
@@ -495,7 +472,6 @@ const App = (() => {
       if (btnLimpiar) btnLimpiar.classList.add("hidden");
       return;
     }
-
     if (btnLimpiar) btnLimpiar.classList.remove("hidden");
     contenedor.classList.remove("hidden");
     contenedor.innerHTML = '<div class="progreso-loading">⏳ Cargando progreso...</div>';
@@ -503,7 +479,6 @@ const App = (() => {
     try {
       const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
       if (!data.ok) throw new Error("Error");
-
       const eventoActual = modoSeleccionado || "SALIDA_PLANTA";
       const info = EVENTOS[eventoActual];
       const ev = data.eventos[eventoActual];
@@ -530,7 +505,7 @@ const App = (() => {
       if (completado && !window['camion_' + camion + '_completado_alertado']) {
         window['camion_' + camion + '_completado_alertado'] = true;
         setTimeout(() => {
-          alert("✅ ¡CAMIÓN " + camion + " COMPLETADO!\n\nSe registraron las " + ev.total + " tarimas.");
+          alert("✅ ¡CAMIÓN " + camion + " COMPLETADO!");
         }, 500);
       }
 
@@ -564,10 +539,7 @@ const App = (() => {
 
   function abrirRegistroManual() {
     const session = getSession();
-    if (!session || session.rol !== "admin") {
-      alert("No tienes permisos.");
-      return;
-    }
+    if (!session || session.rol !== "admin") { alert("No tienes permisos."); return; }
     document.getElementById("manual-camion").value = "";
     document.getElementById("manual-evento").value = "";
     document.getElementById("manual-tarima").innerHTML = '<option value="">-- Primero selecciona un camión --</option>';
@@ -621,10 +593,7 @@ const App = (() => {
 
   async function registrarEventoManual() {
     const session = getSession();
-    if (!session || session.rol !== "admin") {
-      alert("Sesión inválida.");
-      return;
-    }
+    if (!session || session.rol !== "admin") { alert("Sesión inválida."); return; }
     const camion = document.getElementById("manual-camion").value;
     const evento = document.getElementById("manual-evento").value;
     const qrId = document.getElementById("manual-tarima").value;
@@ -670,7 +639,6 @@ const App = (() => {
         }
         return;
       }
-
       statusEl.textContent = "✅ Evento registrado";
       statusEl.className = "send-status ok";
       if (camion === getCamionActual()) setCamionActual(camion);
@@ -706,11 +674,10 @@ const App = (() => {
     const statusEl = document.getElementById("cancelar-status");
 
     if (!session || !["gerencia", "admin"].includes(session.rol)) {
-      statusEl.textContent = "Solo Gerencia y Admin pueden cancelar eventos";
+      statusEl.textContent = "Solo Gerencia y Admin";
       statusEl.className = "send-status error";
       return;
     }
-
     const motivo = document.getElementById("cancelar-motivo").value.trim();
     if (!motivo) {
       statusEl.textContent = "Escribe el motivo";
@@ -745,7 +712,6 @@ const App = (() => {
         statusEl.className = "send-status error";
         return;
       }
-
       statusEl.textContent = "✅ " + (resp.mensaje || "Evento cancelado");
       statusEl.className = "send-status ok";
       setTimeout(() => {
@@ -789,7 +755,7 @@ const App = (() => {
     document.getElementById("loading-text").textContent = "Cargando estatus...";
     try {
       const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camiones");
-      if (!data.ok) throw new Error("Error al cargar estatus");
+      if (!data.ok) throw new Error("Error");
       mostrarListaCamiones(data.camiones);
     } catch (e) {
       alert("Error: " + e.message);
@@ -802,13 +768,11 @@ const App = (() => {
     contenedor.innerHTML = "";
     const activos = camiones.filter(c => c.activo);
     const completados = camiones.filter(c => !c.activo);
-
     if (activos.length === 0 && completados.length === 0) {
       contenedor.innerHTML = '<p style="text-align:center;padding:20px;">No hay camiones registrados.</p>';
       mostrarVista("view-estatus");
       return;
     }
-
     if (activos.length > 0) {
       const t = document.createElement("h3");
       t.textContent = "🔥 Camiones Activos";
@@ -830,11 +794,9 @@ const App = (() => {
     const card = document.createElement("div");
     card.className = "camion-card";
     if (camion.activo) card.classList.add("activo");
-
     const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
     let html = '<div class="camion-titulo">🚚 ' + camion.camion + ' <span class="camion-total">(' + camion.total_tarimas + ' tarimas)</span></div>';
     html += '<div class="eventos-lista">';
-
     EVS.forEach(ev => {
       const info = EVENTOS[ev];
       const e = camion.eventos[ev];
@@ -850,7 +812,6 @@ const App = (() => {
               '<span class="evento-check">' + (e.completado ? '✅' : '⏳') + '</span>' +
               '</div>';
     });
-
     html += '</div>';
     card.innerHTML = html;
     card.addEventListener("click", () => verDetalleCamion(camion.camion));
@@ -862,7 +823,7 @@ const App = (() => {
     document.getElementById("loading-text").textContent = "Cargando detalle...";
     try {
       const data = await jsonp(CONFIG.APPS_SCRIPT_URL + "?accion=estatus_camion&camion=" + encodeURIComponent(camion));
-      if (!data.ok) throw new Error("Error al cargar detalle");
+      if (!data.ok) throw new Error("Error");
       mostrarDetalleCamion(data);
     } catch (e) {
       alert("Error: " + e.message);
@@ -874,7 +835,6 @@ const App = (() => {
     document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
     const contenedor = document.getElementById("detalle-camion");
     contenedor.innerHTML = "";
-
     const session = getSession();
     const puedeCancelar = session && ["gerencia", "admin"].includes(session.rol);
     const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
@@ -928,7 +888,6 @@ const App = (() => {
       } else if (e.faltantes.length > 30) {
         html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
       }
-
       html += '</div>';
     });
 
@@ -946,7 +905,7 @@ const App = (() => {
 })();
 
 // ═══════════════════════════════════════════════════════════════════
-// PEDIDOS - Funciones de PWA
+// PEDIDOS - Frontend
 // ═══════════════════════════════════════════════════════════════════
 
 function formatearNumero(n, decimales = 2) {
@@ -993,8 +952,6 @@ function volverMenu() {
 
 function llamarBackend(url) { return App.jsonp(url); }
 
-// ─── Lista de pedidos ───
-
 async function mostrarListaPedidos() {
   mostrarPantalla("pantalla-pedidos");
   const cont = document.getElementById("lista-pedidos");
@@ -1022,11 +979,12 @@ function renderizarListaPedidos(pedidos) {
   html += "<th style='padding:8px;text-align:left;'>PO</th>";
   html += "<th>CEDIS</th>";
   html += "<th>Estado</th>";
-  html += "<th>PZ</th>";
+  html += "<th>Pedidas</th>";
+  html += "<th>Surtidas</th>";
   html += "<th></th>";
   html += "</tr></thead><tbody>";
   for (const p of pedidos) {
-    const est = p.estado_pedido || "PENDIENTE";
+    const est = p.estado_calculado || p.estado_pedido || "PENDIENTE";
     html += `<tr style="border-bottom:1px solid #eee;">
       <td style="padding:8px;">${p.po}</td>
       <td style="padding:8px;">${(p.cedis || []).join(", ")}</td>
@@ -1036,6 +994,7 @@ function renderizarListaPedidos(pedidos) {
         </span>
       </td>
       <td style="padding:8px;text-align:right;">${formatearNumero(p.total_pz, 0)}</td>
+      <td style="padding:8px;text-align:right;">${formatearNumero(p.pz_surtidas || 0, 0)}</td>
       <td style="padding:8px;"><button onclick="abrirPedido('${p.po}')" style="padding:5px 10px;">Ver</button></td>
     </tr>`;
   }
@@ -1044,8 +1003,6 @@ function renderizarListaPedidos(pedidos) {
 }
 
 function volverListaPedidos() { mostrarListaPedidos(); }
-
-// ─── Formulario ───
 
 function mostrarFormPedido(pedidoExistente = null) {
   skusFormTemporal = [];
@@ -1151,8 +1108,6 @@ async function guardarPedidoForm(evt) {
   }
 }
 
-// ─── Detalle del pedido ───
-
 async function abrirPedido(po) {
   try {
     const url = CONFIG.APPS_SCRIPT_URL + "?accion=ver_pedido&po=" + encodeURIComponent(po);
@@ -1197,8 +1152,10 @@ function renderizarDetallePedido(p) {
         </span>
       </p>
       <p><b>CEDIS:</b> ${(p.cedis || []).join(", ")}</p>
-      <p><b>SKUs:</b> ${p.skus.length} · <b>Total piezas:</b> ${formatearNumero(p.total_pz, 0)}</p>
-      <p><b>Surtidas:</b> ${formatearNumero(p.pz_surtidas_total || 0, 0)} / ${formatearNumero(p.pz_pedidas_total || p.total_pz, 0)}</p>
+      <p><b>SKUs:</b> ${p.skus.length}</p>
+      <p><b>PZ pedidas:</b> ${formatearNumero(p.pz_pedidas_total || 0, 0)} · 
+         <b>Surtidas:</b> ${formatearNumero(p.pz_surtidas_total || 0, 0)} · 
+         <b>Pendientes:</b> <span style="color:#B45309;font-weight:700;">${formatearNumero(p.pz_pendientes_total || 0, 0)}</span></p>
       ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
       <p><b>Capturado:</b> ${formatearFecha(p.fecha_captura)} por ${p.usuario}</p>
     </div>`;
@@ -1211,7 +1168,7 @@ function renderizarDetallePedido(p) {
 function renderizarConsolidado(explosion) {
   const cont = document.getElementById("tab-consolidado");
   if (!explosion || explosion.length === 0) {
-    cont.innerHTML = "<p>Sin insumos calculados.</p>";
+    cont.innerHTML = "<p>Sin insumos calculados (pedido ya surtido).</p>";
     return;
   }
 
@@ -1292,10 +1249,8 @@ function onPrecioChange(input) {
 
   const subCell = document.querySelector(`[data-subtotal="${idx}"]`);
   if (subCell) subCell.textContent = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
-
   const fila = document.querySelector(`tr[data-idx="${idx}"]`);
   if (fila) fila.style.background = "#FFFBEB";
-
   recalcularTotalesGenerales();
 }
 
@@ -1364,8 +1319,6 @@ function cambiarTabPedido(tab, evt) {
   if (contenido) contenido.classList.remove("hidden");
 }
 
-// ─── Acciones ───
-
 async function refrescarStock() {
   if (!pedidoActual) return;
   const url = CONFIG.APPS_SCRIPT_URL + "?accion=refrescar_stock_pedido&po=" + encodeURIComponent(pedidoActual.po);
@@ -1407,8 +1360,8 @@ async function marcarPedidoSurtido(nuevoEstado) {
   }
 
   const msg = nuevoEstado === "SURTIDO"
-    ? "¿Marcar este pedido como SURTIDO? Dejará de contar en el cálculo de otros pedidos."
-    : "¿Reabrir este pedido? Volverá a PENDIENTE y se resetearán las piezas surtidas.";
+    ? "¿Marcar este pedido como SURTIDO manualmente? Dejará de contar en el cálculo de otros pedidos."
+    : "¿Reabrir este pedido? Volverá a PENDIENTE.";
   if (!confirm(msg)) return;
 
   const body = {
@@ -1423,42 +1376,6 @@ async function marcarPedidoSurtido(nuevoEstado) {
     if (!resp.ok) throw new Error(resp.error);
     alert("✅ " + resp.mensaje);
     await abrirPedido(pedidoActual.po);
-  } catch (e) { alert("❌ " + e.message); }
-}
-
-async function verMovimientosPedido() {
-  if (!pedidoActual) return;
-  const url = CONFIG.APPS_SCRIPT_URL + "?accion=listar_movimientos_pedido&po=" + encodeURIComponent(pedidoActual.po);
-  try {
-    const data = await llamarBackend(url);
-    if (!data.ok) throw new Error(data.error);
-
-    if (data.movimientos.length === 0) {
-      return alert("No hay movimientos registrados.");
-    }
-
-    let html = "<table style='width:100%;border-collapse:collapse;font-size:12px;'>";
-    html += "<thead><tr style='background:#f2f2f2;'>";
-    html += "<th style='padding:6px;'>Fecha</th><th>SKU</th><th>PZ</th><th>QR</th><th>Usuario</th>";
-    html += "</tr></thead><tbody>";
-    for (const m of data.movimientos) {
-      html += `<tr style="border-bottom:1px solid #eee;">
-        <td style="padding:6px;">${m.fecha}</td>
-        <td>${m.sku}</td>
-        <td style="text-align:right;">${formatearNumero(m.pz_surtidas, 0)}</td>
-        <td style="font-size:10px;font-family:monospace;">${m.qr_origen}</td>
-        <td>${m.usuario}</td>
-      </tr>`;
-    }
-    html += "</tbody></table>";
-
-    const w = window.open("", "_blank");
-    w.document.write(`<html><head><title>Movimientos PO ${pedidoActual.po}</title></head>
-      <body style="font-family:sans-serif;padding:20px;">
-      <h2>📜 Movimientos del pedido ${pedidoActual.po}</h2>
-      ${html}
-      </body></html>`);
-    w.document.close();
   } catch (e) { alert("❌ " + e.message); }
 }
 
@@ -1557,9 +1474,11 @@ function imprimirPedido() {
       <h1>Pedido de Insumos</h1>
       <p><strong>PO:</strong> ${p.po} &nbsp;·&nbsp; <strong>CEDIS:</strong> ${(p.cedis || []).join(", ")}</p>
       <p><strong>Estado:</strong> ${p.estado_pedido || "PENDIENTE"}</p>
+      <p><strong>PZ pedidas:</strong> ${formatearNumero(p.pz_pedidas_total, 0)} · 
+         <strong>Surtidas:</strong> ${formatearNumero(p.pz_surtidas_total, 0)} · 
+         <strong>Pendientes:</strong> ${formatearNumero(p.pz_pendientes_total, 0)}</p>
       ${p.fecha_entrega ? `<p><strong>Fecha entrega:</strong> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
       <p><strong>Capturado:</strong> ${formatearFecha(p.fecha_captura)} por ${p.usuario || "-"}</p>
-      <p><strong>SKUs:</strong> ${(p.skus || []).length} &nbsp;·&nbsp; <strong>Total piezas:</strong> ${formatearNumero(p.total_pz, 0)}</p>
     </div>
     <div class="encabezado-der">
       <p>Mediese</p>
