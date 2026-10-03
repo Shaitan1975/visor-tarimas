@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#1F4E79">
 <title>Visor Tarimas - Escanear</title>
 
-<!-- ⚠️ FAVICON: estas 4 líneas son las que faltaban -->
+<!-- ⚠️ FAVICON -->
 <link rel="icon" type="image/png" sizes="192x192" href="./icono_192x192.png">
 <link rel="icon" type="image/png" sizes="512x512" href="./icono_512x512.png">
 <link rel="shortcut icon" type="image/png" href="./icono_192x192.png">
@@ -231,119 +231,119 @@
         🔄 Registrar otro
       </button>
     </div>
-</section>
-  
-<!-- Vista: CANCELAR EVENTO -->
-<section id="view-cancelar" class="view-section hidden">
-  <div class="manual-container">
-    <div class="estatus-header">
-      <h2>❌ Cancelar Evento</h2>
-      <button id="btn-cerrar-cancelar" class="btn-cerrar">✖</button>
+  </section>
+
+  <!-- Vista: CANCELAR EVENTO -->
+  <section id="view-cancelar" class="view-section hidden">
+    <div class="manual-container">
+      <div class="estatus-header">
+        <h2>❌ Cancelar Evento</h2>
+        <button id="btn-cerrar-cancelar" class="btn-cerrar">✖</button>
+      </div>
+
+      <p class="manual-descripcion">
+        Confirma los datos del evento a cancelar. Se marcará como CANCELADO y ya no contará en los totales.
+      </p>
+
+      <div class="detalle-info" style="margin-bottom: 15px;">
+        <p><b>Camión:</b> <span id="cancelar-info-camion">-</span></p>
+        <p><b>Evento:</b> <span id="cancelar-info-evento">-</span></p>
+        <p><b>Tarima (QR):</b> <span id="cancelar-info-tarima">-</span></p>
+      </div>
+
+      <div class="input-group">
+        <label for="cancelar-motivo">Motivo de la cancelación *</label>
+        <input type="text" id="cancelar-motivo" placeholder="Ej: Registro por error, tarima duplicada, etc.">
+      </div>
+
+      <p id="cancelar-status" class="send-status"></p>
+
+      <button id="btn-confirmar-cancelar" class="btn-primary btn-large" style="background: #DC2626; border-color: #DC2626;">
+        ❌ Confirmar Cancelación
+      </button>
     </div>
+  </section>
 
-    <p class="manual-descripcion">
-      Confirma los datos del evento a cancelar. Se marcará como CANCELADO y ya no contará en los totales.
-    </p>
+  <!-- ═══════════════════════════════════════════════════════════════
+       PEDIDOS - Pantallas (MULTI-CEDIS)
+       ═══════════════════════════════════════════════════════════════ -->
 
-    <div class="detalle-info" style="margin-bottom: 15px;">
-      <p><b>Camión:</b> <span id="cancelar-info-camion">-</span></p>
-      <p><b>Evento:</b> <span id="cancelar-info-evento">-</span></p>
-      <p><b>Tarima (QR):</b> <span id="cancelar-info-tarima">-</span></p>
+  <!-- PANTALLA: Lista de Pedidos -->
+  <section id="pantalla-pedidos" class="view-section hidden">
+    <div class="estatus-container">
+      <div class="estatus-header">
+        <h2>📦 Pedidos</h2>
+        <button onclick="volverMenu()" class="btn-cerrar">←</button>
+      </div>
+
+      <button class="btn-primary btn-large" onclick="mostrarFormPedido()" style="margin-bottom:15px;">
+        + Nuevo pedido
+      </button>
+
+      <div id="lista-pedidos" class="lista-pedidos"></div>
     </div>
+  </section>
 
-    <div class="input-group">
-      <label for="cancelar-motivo">Motivo de la cancelación *</label>
-      <input type="text" id="cancelar-motivo" placeholder="Ej: Registro por error, tarima duplicada, etc.">
+  <!-- PANTALLA: Formulario de pedido (MULTI-CEDIS) -->
+  <section id="pantalla-form-pedido" class="view-section hidden">
+    <div class="manual-container">
+      <div class="estatus-header">
+        <h2 id="titulo-form-pedido">Nuevo pedido</h2>
+        <button onclick="volverListaPedidos()" class="btn-cerrar">✖</button>
+      </div>
+
+      <p class="manual-descripcion">
+        Puedes agregar varios CEDIS en un mismo pedido. Cada línea (SKU) lleva su propio CEDIS.
+      </p>
+
+      <div class="input-group">
+        <label for="form-po">PO</label>
+        <input type="text" id="form-po" placeholder="14203817" inputmode="numeric">
+      </div>
+
+      <div class="input-group">
+        <label for="form-fecha-entrega">Fecha de entrega (opcional)</label>
+        <input type="date" id="form-fecha-entrega">
+      </div>
+
+      <h3 style="margin-top:20px;">SKUs (SKU · CEDIS · PZ)</h3>
+      <div id="lista-skus-form"></div>
+      <button class="btn-secondary" onclick="agregarFilaSKU()" style="margin-top:8px;">+ Agregar SKU</button>
+
+      <p id="form-pedido-status" class="send-status"></p>
+
+      <button class="btn-primary btn-large" onclick="guardarPedidoForm(event)" style="margin-top:15px;">
+        ✅ Guardar y calcular
+      </button>
     </div>
+  </section>
 
-    <p id="cancelar-status" class="send-status"></p>
+  <!-- PANTALLA: Detalle del pedido -->
+  <section id="pantalla-detalle-pedido" class="view-section hidden">
+    <div class="estatus-container">
+      <div class="estatus-header">
+        <h2 id="titulo-detalle-pedido">Pedido</h2>
+        <button onclick="volverListaPedidos()" class="btn-cerrar">✖</button>
+      </div>
 
-    <button id="btn-confirmar-cancelar" class="btn-primary btn-large" style="background: #DC2626; border-color: #DC2626;">
-      ❌ Confirmar Cancelación
-    </button>
-  </div>
-</section>
-<!-- ═══════════════════════════════════════════════════════════════
-     PEDIDOS - Pantallas nuevas
-     ═══════════════════════════════════════════════════════════════ -->
+      <div id="info-pedido"></div>
 
-<!-- PANTALLA: Lista de Pedidos -->
-<section id="pantalla-pedidos" class="view-section hidden">
-  <div class="estatus-container">
-    <div class="estatus-header">
-      <h2>📦 Pedidos</h2>
-      <button onclick="volverMenu()" class="btn-cerrar">←</button>
+      <div class="tabs" style="display:flex;gap:10px;margin:15px 0;">
+        <button class="tab activo" onclick="cambiarTabPedido('consolidado', event)">Consolidado</button>
+        <button class="tab" onclick="cambiarTabPedido('por-sku', event)">Por SKU</button>
+      </div>
+
+      <div id="tab-consolidado" class="tab-contenido"></div>
+      <div id="tab-por-sku" class="tab-contenido hidden"></div>
+
+      <div class="acciones-detalle" style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
+        <button class="btn-primary" onclick="imprimirPedido()" style="background:#1F4E79;">🖨️ Imprimir / PDF</button>
+        <button class="btn-secondary" onclick="refrescarStock()">🔄 Actualizar stock</button>
+        <button class="btn-secondary" onclick="editarPedidoActual()">✏️ Editar</button>
+        <button class="btn-secondary" style="background:#FEE2E2;color:#991B1B;border-color:#FECACA;" onclick="eliminarPedidoActual()">🗑 Eliminar</button>
+      </div>
     </div>
-
-    <button class="btn-primary btn-large" onclick="mostrarFormPedido()" style="margin-bottom:15px;">
-      + Nuevo pedido
-    </button>
-
-    <div id="lista-pedidos" class="lista-pedidos"></div>
-  </div>
-</section>
-
-<!-- PANTALLA: Formulario de pedido -->
-<section id="pantalla-form-pedido" class="view-section hidden">
-  <div class="manual-container">
-    <div class="estatus-header">
-      <h2 id="titulo-form-pedido">Nuevo pedido</h2>
-      <button onclick="volverListaPedidos()" class="btn-cerrar">✖</button>
-    </div>
-
-    <div class="input-group">
-      <label for="form-po">PO</label>
-      <input type="text" id="form-po" placeholder="14203817" inputmode="numeric">
-    </div>
-
-    <div class="input-group">
-      <label for="form-cedis">CEDIS (últimos 3 dígitos)</label>
-      <input type="text" id="form-cedis" placeholder="006" inputmode="numeric" maxlength="3">
-    </div>
-
-    <div class="input-group">
-      <label for="form-fecha-entrega">Fecha de entrega (opcional)</label>
-      <input type="date" id="form-fecha-entrega">
-    </div>
-
-    <h3 style="margin-top:20px;">SKUs</h3>
-    <div id="lista-skus-form"></div>
-    <button class="btn-secondary" onclick="agregarFilaSKU()" style="margin-top:8px;">+ Agregar SKU</button>
-
-    <p id="form-pedido-status" class="send-status"></p>
-
-    <button class="btn-primary btn-large" onclick="guardarPedidoForm(event)" style="margin-top:15px;">
-      ✅ Guardar y calcular
-    </button>
-  </div>
-</section>
-
-<!-- PANTALLA: Detalle del pedido -->
-<section id="pantalla-detalle-pedido" class="view-section hidden">
-  <div class="estatus-container">
-    <div class="estatus-header">
-      <h2 id="titulo-detalle-pedido">Pedido</h2>
-      <button onclick="volverListaPedidos()" class="btn-cerrar">✖</button>
-    </div>
-
-    <div id="info-pedido"></div>
-
-    <div class="tabs" style="display:flex;gap:10px;margin:15px 0;">
-      <button class="tab activo" onclick="cambiarTabPedido('consolidado', event)">Consolidado</button>
-      <button class="tab" onclick="cambiarTabPedido('por-sku', event)">Por SKU</button>
-    </div>
-
-    <div id="tab-consolidado" class="tab-contenido"></div>
-    <div id="tab-por-sku" class="tab-contenido hidden"></div>
-
-    <div class="acciones-detalle" style="display:flex;gap:10px;margin-top:20px;flex-wrap:wrap;">
-      <button class="btn-primary" onclick="imprimirPedido()" style="background:#1F4E79;">🖨️ Imprimir / PDF</button>
-      <button class="btn-secondary" onclick="refrescarStock()">🔄 Actualizar stock</button>
-      <button class="btn-secondary" onclick="editarPedidoActual()">✏️ Editar</button>
-      <button class="btn-secondary" style="background:#FEE2E2;color:#991B1B;border-color:#FECACA;" onclick="eliminarPedidoActual()">🗑 Eliminar</button>
-    </div>
-  </div>
-</section>
+  </section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
