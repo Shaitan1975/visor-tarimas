@@ -1171,60 +1171,87 @@ details summary {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   PEDIDOS - Formulario multi-CEDIS (fix de desborde)
+   TABLA DE INSUMOS - Con scroll horizontal
    ═══════════════════════════════════════════════════════════════ */
 
-#pantalla-form-pedido .manual-container {
-  max-width: 100%;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 20px 16px;
-}
-
-#pantalla-form-pedido input,
-#pantalla-form-pedido select,
-#pantalla-form-pedido button {
-  box-sizing: border-box;
-  max-width: 100%;
-}
-
-#lista-skus-form {
-  width: 100%;
-  overflow: hidden;
-}
-
-#pantalla-form-pedido .btn-secondary {
-  width: 100%;
-}
-
-/* Tabla de insumos - permitir scroll horizontal en móvil */
-.tabla-insumos {
-  width: 100%;
+/* Contenedor con scroll horizontal */
+#tab-consolidado {
   overflow-x: auto;
-  display: block;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 8px;
+}
+
+.tabla-insumos {
+  border-collapse: collapse;
   font-size: 11px;
-}
-
-.tabla-insumos thead,
-.tabla-insumos tbody,
-.tabla-insumos tr {
-  display: table;
+  min-width: 900px; /* 👈 fuerza ancho mínimo para que no se encoja */
   width: 100%;
-  table-layout: fixed;
 }
 
-.tabla-insumos th,
-.tabla-insumos td {
-  padding: 4px 3px !important;
-  font-size: 10px !important;
-  word-break: break-word;
+.tabla-insumos thead {
+  background: #F2F5F9;
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
-/* Badge de estado del pedido */
-.estado-badge {
-  display: inline-block;
-  padding: 4px 10px;
-  border-radius: 12px;
+.tabla-insumos th {
+  padding: 8px 6px;
+  text-align: left;
   font-weight: 700;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #4A5568;
+  border-bottom: 2px solid #CBD5E0;
+  white-space: nowrap;
+}
+
+.tabla-insumos td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #EDF2F7;
+  vertical-align: middle;
+  white-space: nowrap; /* 👈 evita que el texto se rompa en muchas líneas */
+}
+
+/* Permitir que la descripción sí pueda romperse si es larga */
+.tabla-insumos td:nth-child(2) {
+  white-space: normal;
+  max-width: 220px;
+  min-width: 180px;
+}
+
+/* Columna de insumo más compacta */
+.tabla-insumos td.col-codigo {
+  font-family: "Courier New", monospace;
+  font-weight: 700;
+  color: #1F4E79;
+  font-size: 11px;
+  min-width: 90px;
+}
+
+/* Columnas numéricas alineadas a la derecha */
+.tabla-insumos td.col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  min-width: 70px;
+}
+
+.tabla-insumos th.col-num {
+  text-align: right;
+}
+
+.tabla-insumos td.col-center {
+  text-align: center;
+  min-width: 80px;
+}
+
+/* Inputs de precio más compactos */
+.tabla-insumos input[type="number"] {
+  width: 70px;
+  padding: 4px 6px;
+  border: 1px solid #CCC;
+  border-radius: 4px;
+  text-align: right;
   font-size: 12px;
+  font-family: inherit;
 }
