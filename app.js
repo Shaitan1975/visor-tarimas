@@ -1209,19 +1209,19 @@ function renderizarConsolidado(explosion) {
     html += `<button onclick="guardarPreciosPedido()" style="padding:8px 16px;background:#1F4E79;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">💾 Guardar precios</button>`;
   }
   html += "</div>";
-
+  html += "<div style='font-size:11px;color:#718096;margin-bottom:6px;text-align:right;'>👉 Desliza la tabla para ver más columnas</div>";
   html += "<table class='tabla-insumos' id='tabla-insumos'>";
   html += "<thead><tr>";
   html += "<th>Insumo</th><th>Descripción</th>";
-  html += "<th class='col-num'>Necesario</th>";
+  html += "<th class='col-num'>Neces.</th>";
   html += "<th class='col-num'>Stock</th>";
-  html += "<th class='col-num'>Comprometido</th>";
-  html += "<th class='col-num'>Disponible</th>";
+  html += "<th class='col-num'>Comprom.</th>";
+  html += "<th class='col-num'>Dispon.</th>";
   html += "<th class='col-num'>Faltante</th>";
   html += "<th class='col-num'>Comprar</th>";
   html += "<th class='col-num'>PU</th><th class='col-num'>IVA</th>";
   html += "<th class='col-num'>Subtotal</th>";
-  html += "<th class='col-center'>Estado</th>";
+  html += "<th class='col-center'>Est.</th>";
   html += "</tr></thead><tbody>";
 
   for (let idx = 0; idx < explosion.length; idx++) {
