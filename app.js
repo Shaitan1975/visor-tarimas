@@ -1340,7 +1340,7 @@ function renderizarConsolidado(explosion) {
   html += "</tr></thead><tbody>";
   for (const e of explosion) {
     const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
-    const comprar = e.faltante > 0 ? e.faltante : 0;
+    const comprar = e.comprar && e.comprar > 0 ? e.comprar : (e.faltante > 0 ? e.faltante : 0);
     html += `<tr>
       <td class="col-codigo">${e.insumo}</td>
       <td>${e.descripcion || "—"}</td>
