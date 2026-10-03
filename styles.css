@@ -997,3 +997,81 @@ details summary {
 .fila-sku input {
   font-size: 15px;
 }
+
+/* ═══════════════════════════════════════════
+   TABLA DE INSUMOS - PEDIDOS
+   ═══════════════════════════════════════════ */
+
+.tabla-insumos {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.tabla-insumos thead {
+  background: #1F4E79;
+  color: white;
+}
+
+.tabla-insumos th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tabla-insumos th.col-num,
+.tabla-insumos th.col-center {
+  text-align: center;
+}
+
+.tabla-insumos td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #EEF1F5;
+  vertical-align: middle;
+}
+
+.tabla-insumos tbody tr:nth-child(even) {
+  background: #FAFBFD;
+}
+
+.tabla-insumos tbody tr:hover {
+  background: #F0F4FA;
+}
+
+.tabla-insumos td.col-codigo {
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1F4E79;
+}
+
+.tabla-insumos td.col-num {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tabla-insumos td.col-center {
+  text-align: center;
+}
+
+.tabla-insumos td.col-num.negativo {
+  color: #B45309;
+}
+
+.tabla-insumos td.col-num.comprar {
+  color: #C00000;
+  font-weight: 700;
+}
+
+/* En móvil, la tabla se puede hacer scroll horizontal */
+.tab-contenido {
+  overflow-x: auto;
+}
