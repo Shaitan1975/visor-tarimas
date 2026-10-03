@@ -1172,7 +1172,7 @@ function renderizarListaPedidos(pedidos) {
       <td style="padding:8px;">${p.po}</td>
       <td style="padding:8px;">${p.cedis}</td>
       <td style="padding:8px;">${p.skus.length}</td>
-      <td style="padding:8px;">${p.total_pz.toLocaleString()}</td>
+      <td style="padding:8px;">${formatearNumero(p.total_pz, 0)}</td>
       <td style="padding:8px;"><button onclick="abrirPedido('${p.po}','${p.cedis}')" style="padding:5px 10px;">Ver</button></td>
     </tr>`;
   }
@@ -1338,7 +1338,7 @@ function renderizarDetallePedido(p) {
 
   document.getElementById("info-pedido").innerHTML = `
     <div class="detalle-info" style="margin:15px 0;padding:10px;background:#f9f9f9;border-radius:8px;">
-      <p><b>SKUs:</b> ${p.skus.length} · <b>Total piezas:</b> ${p.total_pz.toLocaleString()}</p>
+      <p><b>SKUs:</b> ${p.skus.length} · <b>Total piezas:</b> ${formatearNumero(p.total_pz, 0)}</p>
       ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
       <p><b>Capturado:</b> ${formatearFecha(p.fecha_captura)} por ${p.usuario}</p>
     </div>
@@ -1396,7 +1396,7 @@ function renderizarPorSKU(skus, explosion) {
   let html = "";
   for (const s of skus) {
     html += `<div class="bloque-sku" style="margin-bottom:15px;padding:10px;background:#f9f9f9;border-radius:8px;">
-      <h4 style="margin:0 0 8px 0;">${s.sku} · ${s.pz.toLocaleString()} PZ · ${s.pt_codigo}</h4>
+      <h4 style="margin:0 0 8px 0;">${s.sku} · ${formatearNumero(p.total_pz, 0)} PZ · ${s.pt_codigo}</h4>
       <ul style="margin:0;padding-left:20px;font-size:13px;">`;
     for (const e of explosion) {
       const porSku = e.por_sku?.find(x => x.pt_codigo === s.sku || x.pt_codigo === s.pt_codigo);
