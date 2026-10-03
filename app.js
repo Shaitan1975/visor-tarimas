@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
-  APPS_SCRIPT_URL: `https://script.google.com/macros/s/AKfycbwtm5cTLUqyWaKXzlrYd4LBuYpWmFyqBSqCyNpsw2C9OvVJcuHVt223UQ3ck5NtRWI0jA/exec`,
+  APPS_SCRIPT_URL: `https://script.google.com/macros/s/AKfycbwjCqDsjwCGqxHsXpUk9za12KBC_iLdfJaKGPBTX--eQ4vXHzmT3ZKSB-6LexLFi0nH/exec`,
   CLAVE_EMPRESA: "MediesE2026$Almacen",
   SALT_PBKDF2: "salt-fijo-empresa-2026",
   ITERACIONES: 100000,
