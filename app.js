@@ -200,6 +200,11 @@ const App = (() => {
     if (session.rol === "admin") {
       document.getElementById("btn-registro-manual").classList.remove("hidden");
     }
+    const ROLES_PEDIDOS = ["gerencia", "admin"];
+    if (ROLES_PEDIDOS.includes(session.rol)) {
+      const btnPedidos = document.getElementById("btn-pedidos");
+      if (btnPedidos) btnPedidos.classList.remove("hidden");
+    }
 
     document.getElementById("btn-logout").addEventListener("click", () => {
       clearSession();
