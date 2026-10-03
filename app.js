@@ -1634,13 +1634,23 @@ function imprimirPedido() {
   const parciales = ordenados.filter(i => i.estado === "PARCIAL").length;
   const oks = ordenados.filter(i => i.estado === "OK").length;
 
-  // Filas de la tabla
+    // Filas de la tabla
   let filasHTML = "";
+  let totalGeneral = 0;
   for (const e of ordenados) {
     const faltante = Number(e.faltante) || 0;
     const comprar = Number(e.comprar) || 0;
+    const pu = Number(e.pu) || 0;
+    const ivaUnit = Number(e.iva_tasa) || 0;
+    const sub = Number(e.subtotal) || 0;
+
+    totalGeneral += sub;
+
     const faltanteTxt = faltante > 0 ? "+" + formatearNumero(faltante) : formatearNumero(faltante);
-    const comprarTxt = comprar > 0 ? formatearNumero(comprar) : "—";
+    const comprarTxt = comprar > 0 ? formatearNumero(comprar) + " " + (e.unidad || "") : "—";
+    const puTxt = pu > 0 ? "$" + formatearNumero(pu) : "—";
+    const ivaTxt = ivaUnit > 0 ? "$" + formatearNumero(ivaUnit) : "—";
+    const subTxt = sub > 0 ? "$" + formatearNumero(sub) : "—";
     const estadoIcon = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
     const colorEstado = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
 
@@ -1652,12 +1662,22 @@ function imprimirPedido() {
       <td class="num">${formatearNumero(e.stock_actual)}</td>
       <td class="num">${faltanteTxt}</td>
       <td class="num comprar">${comprarTxt}</td>
+      <td class="num">${puTxt}</td>
+      <td class="num">${ivaTxt}</td>
+      <td class="num subtotal">${subTxt}</td>
       <td class="centro" style="color:${colorEstado};font-weight:700;">${estadoIcon}</td>
     </tr>`;
   }
 
-  // HTML completo de la hoja de impresión
-  const htmlImpresion = `<!DOCTYPE html>
+  // Fila de total general
+  filasHTML += `<tr class="fila-total">
+    <td colspan="9" style="text-align:right;font-weight:700;font-size:13px;padding-top:10px;">TOTAL A COMPRAR:</td>
+    <td class="num subtotal" style="font-weight:700;font-size:13px;color:#C00000;">$${formatearNumero(totalGeneral)}</td>
+    <td></td>
+  </tr>`;
+
+// HTML completo de la hoja de impresión
+const htmlImpresion = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -1768,6 +1788,8 @@ function imprimirPedido() {
     cursor: pointer;
   }
   .sin-imprimir:hover { background: #4472C4; }
+  td.subtotal { color: #C00000; font-weight: 700; }
+  tr.fila-total { background: #F0F4FA; border-top: 2px solid #1F4E79; }
   @media print {
     .sin-imprimir { display: none; }
     body { padding: 0; }
@@ -1808,6 +1830,9 @@ function imprimirPedido() {
         <th class="num">Stock</th>
         <th class="num">Faltante</th>
         <th class="num">Comprar</th>
+        <th class="num">PU</th>
+        <th class="num">IVA</th>
+        <th class="num">Subtotal</th>
         <th class="centro">Estado</th>
       </tr>
     </thead>
