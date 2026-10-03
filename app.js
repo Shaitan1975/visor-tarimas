@@ -1060,3 +1060,54 @@ const App = (() => {
   };
 
 })();
+
+// ═══════════════════════════════════════════════════════════════════
+// PEDIDOS - Funciones de PWA
+// ═══════════════════════════════════════════════════════════════════
+
+const SKUS_VALIDOS = ["MK150", "MKLM150", "MKCH150"];
+
+async function cargarListaPedidos() {
+  const resp = await fetch(APPS_SCRIPT_URL + "?accion=listar_pedidos");
+  const data = await resp.json();
+  return data;
+}
+
+async function verPedido(po, cedis) {
+  const url = APPS_SCRIPT_URL + "?accion=ver_pedido&po=" + encodeURIComponent(po) + "&cedis=" + encodeURIComponent(cedis);
+  const resp = await fetch(url);
+  return await resp.json();
+}
+
+async function guardarPedido(po, cedis, fechaEntrega, skus) {
+  const body = {
+    po: po,
+    cedis: cedis,
+    fecha_entrega: fechaEntrega || "",
+    skus: skus,
+    usuario: usuarioActual.usuario,
+    nombre: usuarioActual.nombre,
+    rol: usuarioActual.rol
+  };
+  const url = APPS_SCRIPT_URL + "?accion=guardar_pedido&data=" + encodeURIComponent(JSON.stringify(body));
+  const resp = await fetch(url);
+  return await resp.json();
+}
+
+async function eliminarPedido(po, cedis) {
+  const body = {
+    po: po,
+    cedis: cedis,
+    usuario: usuarioActual.usuario,
+    rol: usuarioActual.rol
+  };
+  const url = APPS_SCRIPT_URL + "?accion=eliminar_pedido&data=" + encodeURIComponent(JSON.stringify(body));
+  const resp = await fetch(url);
+  return await resp.json();
+}
+
+async function refrescarStockPedido(po, cedis) {
+  const url = APPS_SCRIPT_URL + "?accion=refrescar_stock_pedido&po=" + encodeURIComponent(po) + "&cedis=" + encodeURIComponent(cedis);
+  const resp = await fetch(url);
+  return await resp.json();
+}
