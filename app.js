@@ -1321,26 +1321,22 @@ function renderizarDetallePedido(p) {
   cambiarTabPedido("consolidado");
 }
 
-function renderizarConsolidado(explosion) {
-  const cont = document.getElementById("tab-consolidado");
-  if (!explosion || explosion.length === 0) {
-    cont.innerHTML = "<p>Sin insumos calculados.</p>";
-    return;
+function renderizarPorSKU(skus, explosion) {
+  const cont = document.getElementById("tab-por-sku");
+  let html = "";
+  for (const s of skus) {
+    html += `<div class="bloque-sku" style="margin-bottom:15px;padding:10px;background:#f9f9f9;border-radius:8px;">
+      <h4 style="margin:0 0 8px 0;">${s.sku} · ${s.pz.toLocaleString()} PZ · ${s.pt_codigo}</h4>
+      <ul style="margin:0;padding-left:20px;font-size:13px;">`;
+    for (const e of explosion) {
+      const porSku = e.por_sku?.find(x => x.pt_codigo === s.sku || x.pt_codigo === s.pt_codigo);
+      if (!porSku) continue;
+      const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
+      const desc = e.descripcion ? " (" + e.descripcion + ")" : "";
+      html += `<li><b>${e.insumo}</b>${desc}: ${porSku.cantidad} ${e.unidad} ${icon}</li>`;
+    }
+    html += "</ul></div>";
   }
-
-  let html = "<table style='width:100%;border-collapse:collapse;font-size:13px;'>";
-  html += "<thead><tr style='background:#f2f2f2;'><th style='padding:8px;text-align:left;'>Insumo</th><th>Necesario</th><th>Stock</th><th>Faltante</th><th>Estado</th></tr></thead><tbody>";
-  for (const e of explosion) {
-    const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
-    html += `<tr style="border-bottom:1px solid #eee;">
-      <td style="padding:8px;">${e.insumo}</td>
-      <td style="padding:8px;text-align:right;">${e.cantidad_necesaria} ${e.unidad}</td>
-      <td style="padding:8px;text-align:right;">${e.stock_actual}</td>
-      <td style="padding:8px;text-align:right;">${e.faltante > 0 ? "+" + e.faltante : e.faltante}</td>
-      <td style="padding:8px;text-align:center;">${icon} ${e.estado}</td>
-    </tr>`;
-  }
-  html += "</tbody></table>";
   cont.innerHTML = html;
 }
 
