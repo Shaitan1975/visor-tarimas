@@ -1075,3 +1075,39 @@ details summary {
 .tab-contenido {
   overflow-x: auto;
 }
+
+/* TABLA DE INSUMOS - PEDIDOS (forzado) */
+.tabla-insumos { 
+  width: 100% !important; 
+  border-collapse: collapse !important; 
+  background: #FFFFFF !important;
+}
+.tabla-insumos thead { 
+  background: #1F4E79 !important; 
+}
+.tabla-insumos th { 
+  background: #1F4E79 !important; 
+  color: #FFFFFF !important; 
+  padding: 12px 8px !important; 
+  font-weight: 700 !important; 
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  text-align: center !important;
+}
+.tabla-insumos td { 
+  padding: 10px 8px !important; 
+  border-bottom: 1px solid #EEF1F5 !important; 
+  color: #1A202C !important;
+}
+.tabla-insumos td.col-codigo { 
+  font-family: monospace !important; 
+  color: #1F4E79 !important; 
+  font-weight: 600 !important;
+}
+.tabla-insumos td.col-num { 
+  text-align: center !important; 
+}
+.tabla-insumos tbody tr:nth-child(even) { 
+  background: #FAFBFD !important; 
+}
