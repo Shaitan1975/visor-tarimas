@@ -1111,3 +1111,36 @@ details summary {
 .tabla-insumos tbody tr:nth-child(even) { 
   background: #FAFBFD !important; 
 }
+
+/* Formulario de pedidos: más ancho para que quepan las filas SKU */
+#pantalla-form-pedido .manual-container {
+  max-width: 520px;
+  width: 100%;
+}
+
+/* Filas de SKU responsivas */
+.fila-sku {
+  box-sizing: border-box;
+}
+
+.fila-sku select,
+.fila-sku input {
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+/* En pantallas muy angostas, la fila se acomoda en 2 líneas */
+@media (max-width: 420px) {
+  .fila-sku {
+    flex-direction: row;
+  }
+  .fila-sku select {
+    flex: 1 1 100%;
+  }
+  .fila-sku input[type="text"] {
+    flex: 1 1 60px;
+  }
+  .fila-sku input[type="number"] {
+    flex: 1 1 80px;
+  }
+}
