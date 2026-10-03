@@ -1117,39 +1117,40 @@ function mostrarFormPedido(pedidoExistente = null) {
 function renderizarSKUsForm() {
   const cont = document.getElementById("lista-skus-form");
   let html = "";
+
   skusFormTemporal.forEach((s, i) => {
     html += `
-      <div class="fila-sku" style="
-        display:flex;
-        flex-wrap:wrap;
+      <div style="
+        display:grid;
+        grid-template-columns: 80px 1fr 70px 34px;
         gap:6px;
-        margin-bottom:8px;
         align-items:center;
-        padding:8px;
-        background:#f9f9f9;
-        border-radius:8px;
+        margin-bottom:6px;
       ">
         <select onchange="cambiarSKU(${i}, this.value)"
-          style="flex:1 1 90px;min-width:90px;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;">
-          ${SKUS_VALIDOS.map(sku => `<option value="${sku}" ${sku === s.sku ? "selected" : ""}>${sku}</option>`).join("")}
+          style="width:100%;padding:6px 4px;border:1px solid #ccc;border-radius:6px;font-size:12px;">
+          ${SKUS_VALIDOS.map(sku =>
+            `<option value="${sku}" ${sku === s.sku ? "selected" : ""}>${sku}</option>`
+          ).join("")}
         </select>
 
         <input type="text" inputmode="numeric" placeholder="CEDIS" maxlength="3"
           value="${s.cedis || ""}"
           onchange="cambiarCedis(${i}, this.value)"
-          style="flex:0 1 70px;min-width:60px;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:center;">
+          style="width:100%;padding:6px 4px;border:1px solid #ccc;border-radius:6px;font-size:12px;text-align:center;">
 
         <input type="number" inputmode="numeric" placeholder="PZ" min="0"
           value="${s.pz || ""}"
           onchange="cambiarPZ(${i}, this.value)"
-          style="flex:1 1 80px;min-width:70px;padding:8px;border:1px solid #ccc;border-radius:6px;font-size:13px;text-align:right;">
+          style="width:100%;padding:6px 4px;border:1px solid #ccc;border-radius:6px;font-size:12px;text-align:right;">
 
         <button onclick="quitarFilaSKU(${i})"
-          style="flex:0 0 36px;height:36px;padding:0;background:#FEE2E2;border:1px solid #FECACA;border-radius:6px;cursor:pointer;font-size:14px;">
+          style="width:34px;height:32px;padding:0;background:#FEE2E2;border:1px solid #FECACA;border-radius:6px;cursor:pointer;font-size:13px;">
           🗑
         </button>
       </div>`;
   });
+
   cont.innerHTML = html;
 }
 
