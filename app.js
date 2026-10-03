@@ -1676,20 +1676,13 @@ function imprimirPedido() {
     <td></td>
   </tr>`;
 
-// HTML completo de la hoja de impresión
-const htmlImpresion = `<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Pedido ${p.po}-${p.cedis}</title>
-<style>
-  @page { size: A4; margin: 15mm; }
+  @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     color: #1A202C;
     padding: 20px;
-    font-size: 12px;
+    font-size: 11px;
     background: white;
   }
   .encabezado {
@@ -1700,21 +1693,9 @@ const htmlImpresion = `<!DOCTYPE html>
     padding-bottom: 12px;
     margin-bottom: 15px;
   }
-  .encabezado-izq h1 {
-    font-size: 20px;
-    color: #1F4E79;
-    margin-bottom: 4px;
-  }
-  .encabezado-izq p {
-    font-size: 13px;
-    color: #4A5568;
-    margin: 2px 0;
-  }
-  .encabezado-der {
-    text-align: right;
-    font-size: 11px;
-    color: #4A5568;
-  }
+  .encabezado-izq h1 { font-size: 20px; color: #1F4E79; margin-bottom: 4px; }
+  .encabezado-izq p { font-size: 12px; color: #4A5568; margin: 2px 0; }
+  .encabezado-der { text-align: right; font-size: 11px; color: #4A5568; }
   .resumen {
     display: flex;
     gap: 20px;
@@ -1723,7 +1704,7 @@ const htmlImpresion = `<!DOCTYPE html>
     border-radius: 6px;
     padding: 10px 15px;
     margin-bottom: 15px;
-    font-size: 12px;
+    font-size: 11px;
   }
   .resumen strong { color: #1F4E79; }
   .resumen .st-stock { color: #C00000; font-weight: 700; }
@@ -1732,24 +1713,33 @@ const htmlImpresion = `<!DOCTYPE html>
   table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 11px;
+    font-size: 10px;
+    table-layout: auto;
   }
   thead {
     background: #1F4E79;
     color: white;
   }
   th {
-    padding: 8px 6px;
-    text-align: left;
+    padding: 8px 5px;
     font-weight: 600;
-    font-size: 10px;
+    font-size: 9px;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.3px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  th:first-child, th:nth-child(2) {
+    text-align: left;
   }
   td {
-    padding: 6px;
+    padding: 6px 5px;
     border-bottom: 1px solid #EEF1F5;
     vertical-align: middle;
+    text-align: center;
+  }
+  td:first-child, td:nth-child(2) {
+    text-align: left;
   }
   tr:nth-child(even) { background: #FAFBFD; }
   td.codigo {
@@ -1758,14 +1748,29 @@ const htmlImpresion = `<!DOCTYPE html>
     color: #1F4E79;
   }
   td.num {
-    text-align: right;
+    text-align: center;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  td.centro { text-align: center; }
+  td.centro {
+    text-align: center;
+  }
   td.comprar {
     color: #C00000;
     font-weight: 700;
+  }
+  td.subtotal {
+    color: #C00000;
+    font-weight: 700;
+  }
+  tr.fila-total {
+    background: #F0F4FA;
+    border-top: 2px solid #1F4E79;
+  }
+  tr.fila-total td {
+    font-weight: 700;
+    font-size: 11px;
+    padding: 10px 5px;
   }
   .pie {
     margin-top: 20px;
@@ -1788,12 +1793,11 @@ const htmlImpresion = `<!DOCTYPE html>
     cursor: pointer;
   }
   .sin-imprimir:hover { background: #4472C4; }
-  td.subtotal { color: #C00000; font-weight: 700; }
-  tr.fila-total { background: #F0F4FA; border-top: 2px solid #1F4E79; }
   @media print {
     .sin-imprimir { display: none; }
     body { padding: 0; }
   }
+
 </style>
 </head>
 <body>
@@ -1820,20 +1824,20 @@ const htmlImpresion = `<!DOCTYPE html>
     <div><span class="st-ok">✅ OK:</span> ${oks}</div>
   </div>
 
-  <table>
+    <table>
     <thead>
       <tr>
-        <th>Código</th>
-        <th>Descripción</th>
-        <th class="centro">Unidad</th>
-        <th class="num">Necesario</th>
-        <th class="num">Stock</th>
-        <th class="num">Faltante</th>
-        <th class="num">Comprar</th>
-        <th class="num">PU</th>
-        <th class="num">IVA</th>
-        <th class="num">Subtotal</th>
-        <th class="centro">Estado</th>
+        <th style="text-align:left;">Código</th>
+        <th style="text-align:left;">Descripción</th>
+        <th style="text-align:center;">Unidad</th>
+        <th style="text-align:center;">Necesario</th>
+        <th style="text-align:center;">Stock</th>
+        <th style="text-align:center;">Faltante</th>
+        <th style="text-align:center;">Comprar</th>
+        <th style="text-align:center;">PU</th>
+        <th style="text-align:center;">IVA</th>
+        <th style="text-align:center;">Subtotal</th>
+        <th style="text-align:center;">Estado</th>
       </tr>
     </thead>
     <tbody>
