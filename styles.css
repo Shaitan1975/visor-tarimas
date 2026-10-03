@@ -904,3 +904,41 @@ details summary {
   margin: 4px 0;
   font-size: 14px;
 }
+
+.pantalla { max-width: 800px; margin: 0 auto; }
+.header-app { display: flex; align-items: center; gap: 10px; padding: 10px; }
+
+.lista-pedidos table, #tab-consolidado table {
+  width: 100%; border-collapse: collapse; margin-top: 15px;
+}
+.lista-pedidos th, #tab-consolidado th {
+  background: #f2f2f2; padding: 8px; text-align: left; font-size: 13px;
+}
+.lista-pedidos td, #tab-consolidado td {
+  padding: 8px; border-bottom: 1px solid #eee; font-size: 14px;
+}
+
+.fila-sku {
+  display: grid; grid-template-columns: 1fr 1fr auto;
+  gap: 8px; margin-bottom: 8px; align-items: center;
+}
+.fila-sku input, .fila-sku select {
+  padding: 8px; border: 1px solid #ccc; border-radius: 4px;
+}
+
+.btn-primario, .btn-secundario, .btn-peligro, .btn-cancelar {
+  padding: 10px 15px; border-radius: 5px; border: none; cursor: pointer;
+  font-size: 14px; margin: 5px 5px 5px 0;
+}
+.btn-primario { background: #1F7A1F; color: white; }
+.btn-secundario { background: #ddd; }
+.btn-peligro { background: #C00000; color: white; }
+.btn-cancelar { background: #999; color: white; }
+
+.tabs { display: flex; gap: 10px; margin: 15px 0; }
+.tab { padding: 8px 15px; border: 1px solid #ccc; background: white; cursor: pointer; }
+.tab.activo { background: #1F7A1F; color: white; }
+
+.info-pedido { background: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px; }
+.bloque-sku { margin-bottom: 15px; padding: 10px; background: #f9f9f9; border-radius: 5px; }
+.acciones-detalle { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
