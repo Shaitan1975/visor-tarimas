@@ -51,3 +51,73 @@
 </script>
 </body>
 </html>
+
+<!-- PANTALLA: Lista de Pedidos -->
+<div id="pantalla-pedidos" class="pantalla" style="display:none;">
+  <div class="header-app">
+    <button onclick="volverMenu()">←</button>
+    <h2>Pedidos</h2>
+  </div>
+
+  <div class="contenido">
+    <button class="btn-primario" onclick="mostrarFormPedido()">+ Nuevo pedido</button>
+
+    <div id="lista-pedidos" class="lista-pedidos">
+      <!-- Se llena dinámicamente -->
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA: Formulario de pedido -->
+<div id="pantalla-form-pedido" class="pantalla" style="display:none;">
+  <div class="header-app">
+    <button onclick="volverListaPedidos()">←</button>
+    <h2 id="titulo-form-pedido">Nuevo pedido</h2>
+  </div>
+
+  <div class="contenido">
+    <label>PO</label>
+    <input type="text" id="form-po" placeholder="14203817" inputmode="numeric">
+
+    <label>CEDIS</label>
+    <input type="text" id="form-cedis" placeholder="006" inputmode="numeric" maxlength="3">
+
+    <label>Fecha de entrega (opcional)</label>
+    <input type="date" id="form-fecha-entrega">
+
+    <h3>SKUs</h3>
+    <div id="lista-skus-form"></div>
+    <button class="btn-secundario" onclick="agregarFilaSKU()">+ Agregar SKU</button>
+
+    <div class="botones-form">
+      <button class="btn-primario" onclick="guardarPedidoForm()">Guardar y calcular</button>
+      <button class="btn-cancelar" onclick="volverListaPedidos()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- PANTALLA: Detalle / resultado -->
+<div id="pantalla-detalle-pedido" class="pantalla" style="display:none;">
+  <div class="header-app">
+    <button onclick="volverListaPedidos()">←</button>
+    <h2 id="titulo-detalle-pedido">Pedido</h2>
+  </div>
+
+  <div class="contenido">
+    <div id="info-pedido"></div>
+
+    <div class="tabs">
+      <button class="tab activo" onclick="cambiarTabPedido('consolidado')">Consolidado</button>
+      <button class="tab" onclick="cambiarTabPedido('por-sku')">Por SKU</button>
+    </div>
+
+    <div id="tab-consolidado" class="tab-contenido"></div>
+    <div id="tab-por-sku" class="tab-contenido" style="display:none;"></div>
+
+    <div class="acciones-detalle">
+      <button class="btn-secundario" onclick="refrescarStock()">🔄 Actualizar stock</button>
+      <button class="btn-secundario" onclick="editarPedidoActual()">✏️ Editar</button>
+      <button class="btn-peligro" onclick="eliminarPedidoActual()">🗑 Eliminar</button>
+    </div>
+  </div>
+</div>
