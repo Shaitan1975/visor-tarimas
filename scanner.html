@@ -285,39 +285,39 @@
   </section>
 
   <!-- PANTALLA: Formulario de pedido (MULTI-CEDIS) -->
-  <section id="pantalla-form-pedido" class="view-section hidden">
-    <div class="manual-container">
-      <div class="estatus-header">
-        <h2 id="titulo-form-pedido">Nuevo pedido</h2>
-        <button onclick="volverListaPedidos()" class="btn-cerrar">✖</button>
-      </div>
-
-      <p class="manual-descripcion">
-        Puedes agregar varios CEDIS en un mismo pedido. Cada línea (SKU) lleva su propio CEDIS.
-      </p>
-
-      <div class="input-group">
-        <label for="form-po">PO</label>
-        <input type="text" id="form-po" placeholder="14203817" inputmode="numeric">
-      </div>
-
-      <div class="input-group">
-        <label for="form-fecha-entrega">Fecha de entrega (opcional)</label>
-        <input type="date" id="form-fecha-entrega">
-      </div>
-
-      <h3 style="margin-top:20px;">SKUs (SKU · CEDIS · PZ)</h3>
-      <div id="lista-skus-form"></div>
-      <button class="btn-secondary" onclick="agregarFilaSKU()" style="margin-top:8px;">+ Agregar SKU</button>
-
-      <p id="form-pedido-status" class="send-status"></p>
-
-      <button class="btn-primary btn-large" onclick="guardarPedidoForm(event)" style="margin-top:15px;">
-        ✅ Guardar y calcular
-      </button>
+<section id="pantalla-form-pedido" class="view-section hidden">
+  <div class="manual-container">
+    <div class="estatus-header">
+      <h2 id="titulo-form-pedido">Nuevo pedido</h2>
+      <button onclick="volverListaPedidos()" class="btn-cerrar">✖</button>
     </div>
-  </section>
 
+    <p class="manual-descripcion">
+      Puedes agregar varios CEDIS en un mismo pedido. Cada línea (SKU) lleva su propio CEDIS.
+    </p>
+
+    <div class="input-group">
+      <label for="form-po">PO</label>
+      <input type="text" id="form-po" placeholder="14203817" inputmode="numeric">
+    </div>
+
+    <div class="input-group">
+      <label for="form-fecha-entrega">Fecha de entrega (opcional)</label>
+      <input type="date" id="form-fecha-entrega">
+    </div>
+
+    <h3 style="margin-top:20px;">SKUs</h3>
+    <div id="lista-skus-form"></div>
+    <button class="btn-secondary" onclick="agregarFilaSKU()" style="margin-top:8px;width:100%;">+ Agregar SKU</button>
+
+    <p id="form-pedido-status" class="send-status"></p>
+
+    <button class="btn-primary btn-large" onclick="guardarPedidoForm(event)" style="margin-top:15px;">
+      ✅ Guardar y calcular
+    </button>
+  </div>
+</section>
+  
   <!-- PANTALLA: Detalle del pedido -->
   <section id="pantalla-detalle-pedido" class="view-section hidden">
     <div class="estatus-container">
