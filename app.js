@@ -1111,3 +1111,222 @@ async function refrescarStockPedido(po, cedis) {
   const resp = await fetch(url);
   return await resp.json();
 }
+
+// Estado global
+let pedidoActual = null;
+let skusFormTemporal = [];
+
+function volverMenu() {
+  mostrarPantalla("pantalla-menu");
+}
+
+function mostrarPantalla(id) {
+  document.querySelectorAll(".pantalla").forEach(p => p.style.display = "none");
+  document.getElementById(id).style.display = "block";
+}
+
+async function mostrarListaPedidos() {
+  mostrarPantalla("pantalla-pedidos");
+  const data = await cargarListaPedidos();
+  renderizarListaPedidos(data.pedidos || []);
+}
+
+function renderizarListaPedidos(pedidos) {
+  const cont = document.getElementById("lista-pedidos");
+  if (pedidos.length === 0) {
+    cont.innerHTML = "<p>No hay pedidos capturados.</p>";
+    return;
+  }
+
+  let html = "<table><thead><tr><th>PO</th><th>CEDIS</th><th>SKUs</th><th>PZ</th><th></th></tr></thead><tbody>";
+  for (const p of pedidos) {
+    html += `<tr>
+      <td>${p.po}</td>
+      <td>${p.cedis}</td>
+      <td>${p.skus.length}</td>
+      <td>${p.total_pz.toLocaleString()}</td>
+      <td><button onclick="abrirPedido('${p.po}','${p.cedis}')">Ver</button></td>
+    </tr>`;
+  }
+  html += "</tbody></table>";
+  cont.innerHTML = html;
+}
+
+function volverListaPedidos() {
+  mostrarListaPedidos();
+}
+
+// ─── Formulario ───
+
+function mostrarFormPedido(pedidoExistente = null) {
+  skusFormTemporal = [];
+  document.getElementById("form-po").value = "";
+  document.getElementById("form-cedis").value = "";
+  document.getElementById("form-fecha-entrega").value = "";
+  document.getElementById("titulo-form-pedido").textContent = "Nuevo pedido";
+
+  if (pedidoExistente) {
+    document.getElementById("form-po").value = pedidoExistente.po;
+    document.getElementById("form-cedis").value = pedidoExistente.cedis;
+    document.getElementById("form-fecha-entrega").value = pedidoExistente.fecha_entrega || "";
+    document.getElementById("titulo-form-pedido").textContent = "Editar pedido";
+    skusFormTemporal = pedidoExistente.skus.map(s => ({ sku: s.sku, pz: s.pz }));
+  } else {
+    skusFormTemporal = [{ sku: "MK150", pz: 0 }];
+  }
+
+  renderizarSKUsForm();
+  mostrarPantalla("pantalla-form-pedido");
+}
+
+function renderizarSKUsForm() {
+  const cont = document.getElementById("lista-skus-form");
+  let html = "";
+  skusFormTemporal.forEach((s, i) => {
+    html += `<div class="fila-sku">
+      <select onchange="cambiarSKU(${i}, this.value)">
+        ${SKUS_VALIDOS.map(sku => `<option value="${sku}" ${sku === s.sku ? "selected" : ""}>${sku}</option>`).join("")}
+      </select>
+      <input type="number" inputmode="numeric" value="${s.pz}" onchange="cambiarPZ(${i}, this.value)">
+      <button onclick="quitarFilaSKU(${i})">🗑</button>
+    </div>`;
+  });
+  cont.innerHTML = html;
+}
+
+function agregarFilaSKU() {
+  skusFormTemporal.push({ sku: "MK150", pz: 0 });
+  renderizarSKUsForm();
+}
+
+function quitarFilaSKU(i) {
+  skusFormTemporal.splice(i, 1);
+  if (skusFormTemporal.length === 0) skusFormTemporal.push({ sku: "MK150", pz: 0 });
+  renderizarSKUsForm();
+}
+
+function cambiarSKU(i, v) { skusFormTemporal[i].sku = v; }
+function cambiarPZ(i, v) { skusFormTemporal[i].pz = Number(v) || 0; }
+
+async function guardarPedidoForm() {
+  const po = document.getElementById("form-po").value.trim();
+  const cedis = document.getElementById("form-cedis").value.trim().padStart(3, "0");
+  const fecha = document.getElementById("form-fecha-entrega").value;
+
+  if (!po) return alert("Falta PO");
+  if (!cedis) return alert("Falta CEDIS");
+
+  const skus = skusFormTemporal.filter(s => s.pz > 0);
+  if (skus.length === 0) return alert("Agrega al menos un SKU con cantidad");
+
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Calculando...";
+
+  const resp = await guardarPedido(po, cedis, fecha, skus);
+  btn.disabled = false;
+  btn.textContent = "Guardar y calcular";
+
+  if (!resp.ok) return alert("Error: " + resp.error);
+
+  await abrirPedido(po, cedis);
+}
+
+// ─── Detalle ───
+
+async function abrirPedido(po, cedis) {
+  const data = await verPedido(po, cedis);
+  if (!data.ok) return alert("Error: " + data.error);
+
+  pedidoActual = data;
+  renderizarDetallePedido(data);
+  mostrarPantalla("pantalla-detalle-pedido");
+}
+
+function renderizarDetallePedido(p) {
+  document.getElementById("titulo-detalle-pedido").textContent =
+    "PO " + p.po + " · CEDIS " + p.cedis;
+
+  document.getElementById("info-pedido").innerHTML = `
+    <div class="info-pedido">
+      <p><b>SKUs:</b> ${p.skus.length} · <b>Total piezas:</b> ${p.total_pz.toLocaleString()}</p>
+      ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${p.fecha_entrega}</p>` : ""}
+      <p><b>Capturado:</b> ${p.fecha_captura} por ${p.usuario}</p>
+    </div>
+  `;
+
+  renderizarConsolidado(p.explosion);
+  renderizarPorSKU(p.skus, p.explosion);
+  cambiarTabPedido("consolidado");
+}
+
+function renderizarConsolidado(explosion) {
+  const cont = document.getElementById("tab-consolidado");
+  if (!explosion || explosion.length === 0) {
+    cont.innerHTML = "<p>Sin insumos calculados.</p>";
+    return;
+  }
+
+  let html = "<table><thead><tr><th>Insumo</th><th>Necesario</th><th>Stock</th><th>Faltante</th><th>Estado</th></tr></thead><tbody>";
+  for (const e of explosion) {
+    const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
+    html += `<tr>
+      <td>${e.insumo}</td>
+      <td>${e.cantidad_necesaria} ${e.unidad}</td>
+      <td>${e.stock_actual}</td>
+      <td>${e.faltante > 0 ? "+" + e.faltante : e.faltante}</td>
+      <td>${icon} ${e.estado}</td>
+    </tr>`;
+  }
+  html += "</tbody></table>";
+  cont.innerHTML = html;
+}
+
+function renderizarPorSKU(skus, explosion) {
+  const cont = document.getElementById("tab-por-sku");
+  let html = "";
+  for (const s of skus) {
+    html += `<div class="bloque-sku">
+      <h4>${s.sku} · ${s.pz.toLocaleString()} PZ · ${s.pt_codigo}</h4>
+      <ul>`;
+    for (const e of explosion) {
+      const porSku = e.por_sku?.find(x => x.pt_codigo === s.sku || x.pt_codigo === s.pt_codigo);
+      if (!porSku) continue;
+      const icon = e.estado === "OK" ? "✅" : (e.estado === "PARCIAL" ? "⚠️" : "❌");
+      html += `<li>${e.insumo}: ${porSku.cantidad} ${e.unidad} ${icon}</li>`;
+    }
+    html += "</ul></div>";
+  }
+  cont.innerHTML = html;
+}
+
+function cambiarTabPedido(tab) {
+  document.querySelectorAll("#pantalla-detalle-pedido .tab").forEach(t => t.classList.remove("activo"));
+  document.querySelectorAll("#pantalla-detalle-pedido .tab-contenido").forEach(c => c.style.display = "none");
+  document.querySelector(`#pantalla-detalle-pedido .tab[onclick*="${tab}"]`).classList.add("activo");
+  document.getElementById("tab-" + tab).style.display = "block";
+}
+
+// ─── Acciones sobre el pedido ───
+
+async function refrescarStock() {
+  if (!pedidoActual) return;
+  const resp = await refrescarStockPedido(pedidoActual.po, pedidoActual.cedis);
+  if (!resp.ok) return alert("Error: " + resp.error);
+  pedidoActual.explosion = resp.explosion;
+  renderizarConsolidado(resp.explosion);
+  renderizarPorSKU(pedidoActual.skus, resp.explosion);
+  alert("Stock actualizado: " + resp.refrescado);
+}
+
+function editarPedidoActual() {
+  mostrarFormPedido(pedidoActual);
+}
+
+async function eliminarPedidoActual() {
+  if (!confirm("¿Eliminar este pedido? Se puede recuperar del historial.")) return;
+  const resp = await eliminarPedido(pedidoActual.po, pedidoActual.cedis);
+  if (!resp.ok) return alert("Error: " + resp.error);
+  alert("Pedido eliminado");
+  mostrarListaPedidos();
+}
