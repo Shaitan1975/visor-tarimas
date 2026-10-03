@@ -876,7 +876,7 @@ const App = (() => {
           if (document.body.contains(script)) document.body.removeChild(script);
           reject(new Error("Timeout"));
         }
-      }, 15000);
+      }, 60000);
     });
   }
 
