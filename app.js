@@ -1616,25 +1616,26 @@ async function eliminarPedidoActual() {
  * Abre una ventana nueva con la versión imprimible del pedido.
  * El usuario puede imprimir o "Guardar como PDF" desde el navegador.
  */
+/**
+ * Abre una ventana nueva con la versión imprimible del pedido.
+ * El usuario puede imprimir o "Guardar como PDF" desde el navegador.
+ */
 function imprimirPedido() {
   if (!pedidoActual) return;
 
   const p = pedidoActual;
   const insumos = p.explosion || [];
 
-  // Ordenar por estado: SIN_STOCK, PARCIAL, OK
   const orden = { "SIN_STOCK": 0, "PARCIAL": 1, "OK": 2 };
   const ordenados = insumos.slice().sort((a, b) => {
     return (orden[a.estado] || 9) - (orden[b.estado] || 9);
   });
 
-  // Resumen
   const total = ordenados.length;
   const sinStock = ordenados.filter(i => i.estado === "SIN_STOCK").length;
   const parciales = ordenados.filter(i => i.estado === "PARCIAL").length;
   const oks = ordenados.filter(i => i.estado === "OK").length;
 
-    // Filas de la tabla
   let filasHTML = "";
   let totalGeneral = 0;
   for (const e of ordenados) {
@@ -1669,13 +1670,18 @@ function imprimirPedido() {
     </tr>`;
   }
 
-  // Fila de total general
   filasHTML += `<tr class="fila-total">
     <td colspan="9" style="text-align:right;font-weight:700;font-size:13px;padding-top:10px;">TOTAL A COMPRAR:</td>
     <td class="num subtotal" style="font-weight:700;font-size:13px;color:#C00000;">$${formatearNumero(totalGeneral)}</td>
     <td></td>
   </tr>`;
 
+  const htmlImpresion = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Pedido ${p.po}-${p.cedis}</title>
+<style>
   @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -1714,7 +1720,6 @@ function imprimirPedido() {
     width: 100%;
     border-collapse: collapse;
     font-size: 10px;
-    table-layout: auto;
   }
   thead {
     background: #1F4E79;
@@ -1752,17 +1757,9 @@ function imprimirPedido() {
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  td.centro {
-    text-align: center;
-  }
-  td.comprar {
-    color: #C00000;
-    font-weight: 700;
-  }
-  td.subtotal {
-    color: #C00000;
-    font-weight: 700;
-  }
+  td.centro { text-align: center; }
+  td.comprar { color: #C00000; font-weight: 700; }
+  td.subtotal { color: #C00000; font-weight: 700; }
   tr.fila-total {
     background: #F0F4FA;
     border-top: 2px solid #1F4E79;
@@ -1797,7 +1794,6 @@ function imprimirPedido() {
     .sin-imprimir { display: none; }
     body { padding: 0; }
   }
-
 </style>
 </head>
 <body>
@@ -1824,20 +1820,20 @@ function imprimirPedido() {
     <div><span class="st-ok">✅ OK:</span> ${oks}</div>
   </div>
 
-    <table>
+  <table>
     <thead>
       <tr>
-        <th style="text-align:left;">Código</th>
-        <th style="text-align:left;">Descripción</th>
-        <th style="text-align:center;">Unidad</th>
-        <th style="text-align:center;">Necesario</th>
-        <th style="text-align:center;">Stock</th>
-        <th style="text-align:center;">Faltante</th>
-        <th style="text-align:center;">Comprar</th>
-        <th style="text-align:center;">PU</th>
-        <th style="text-align:center;">IVA</th>
-        <th style="text-align:center;">Subtotal</th>
-        <th style="text-align:center;">Estado</th>
+        <th>Código</th>
+        <th>Descripción</th>
+        <th>Unidad</th>
+        <th>Necesario</th>
+        <th>Stock</th>
+        <th>Faltante</th>
+        <th>Comprar</th>
+        <th>PU</th>
+        <th>IVA</th>
+        <th>Subtotal</th>
+        <th>Estado</th>
       </tr>
     </thead>
     <tbody>
@@ -1851,7 +1847,6 @@ function imprimirPedido() {
 </body>
 </html>`;
 
-  // Abrir en ventana nueva
   const ventana = window.open("", "_blank");
   if (!ventana) {
     alert("El navegador bloqueó la ventana emergente. Permite ventanas para este sitio e intenta de nuevo.");
