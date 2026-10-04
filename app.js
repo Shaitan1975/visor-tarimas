@@ -1695,6 +1695,7 @@ async function imprimirConsolidado() {
 
     const pedidos = data.pedidos || [];
     const insumosConsolidados = data.insumos_consolidados || [];
+    const ptConsolidado = data.pt_consolidado || [];
 
     // ═══════════════════════════════════════════════════════════════
     // Sección 1: Detalle por pedido
@@ -1704,6 +1705,54 @@ async function imprimirConsolidado() {
     for (const pedido of pedidos) {
       const fechaStr = formatearFecha(pedido.fecha);
 
+      // 🔥 Tabla PT por pedido
+      let filasPT_Pedido = "";
+      let totPed = 0, totSur = 0, totStock = 0, totPend = 0;
+      for (const pt of (pedido.pt || [])) {
+        totPed += pt.pz_pedidas || 0;
+        totSur += pt.pz_surtidas || 0;
+        totStock += pt.pz_en_stock || 0;
+        totPend += pt.pz_pendientes || 0;
+        filasPT_Pedido += `<tr>
+          <td class="codigo">${pt.pt_codigo}</td>
+          <td class="desc">${pt.descripcion || "—"}</td>
+          <td class="num">${formatearNumero(pt.pz_pedidas, 0)}</td>
+          <td class="num">${formatearNumero(pt.pz_surtidas, 0)}</td>
+          <td class="num stock">${formatearNumero(pt.pz_en_stock, 0)}</td>
+          <td class="num pend">${formatearNumero(pt.pz_pendientes, 0)}</td>
+        </tr>`;
+      }
+
+      let tablaPT_PedidoHTML = "";
+      if ((pedido.pt || []).length > 0) {
+        tablaPT_PedidoHTML = `
+          <h3 class="sub-titulo">📦 Producto Terminado (PT)</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Código OAR</th>
+                <th>Descripción</th>
+                <th>Pedidas</th>
+                <th>Surtidas</th>
+                <th>Stock PT</th>
+                <th>Pendientes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filasPT_Pedido}
+              <tr class="fila-total">
+                <td colspan="2" style="text-align:right;">TOTAL:</td>
+                <td class="num">${formatearNumero(totPed, 0)}</td>
+                <td class="num">${formatearNumero(totSur, 0)}</td>
+                <td class="num stock">${formatearNumero(totStock, 0)}</td>
+                <td class="num pend">${formatearNumero(totPend, 0)}</td>
+              </tr>
+            </tbody>
+          </table>
+        `;
+      }
+
+      // Tabla de insumos
       let filasInsumosHTML = "";
       for (const e of pedido.insumos) {
         const estadoIcon = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
@@ -1730,8 +1779,13 @@ async function imprimirConsolidado() {
             <strong>Fecha:</strong> ${fechaStr} &nbsp;·&nbsp;
             <strong>Pedidas:</strong> ${formatearNumero(pedido.pz_pedidas, 0)} PZ &nbsp;·&nbsp;
             <strong>Surtidas:</strong> ${formatearNumero(pedido.pz_surtidas, 0)} &nbsp;·&nbsp;
+            <strong>En Stock PT:</strong> <span style="color:#1F7A1F;font-weight:700;">${formatearNumero(pedido.pz_en_stock, 0)}</span> &nbsp;·&nbsp;
             <strong>Pendientes:</strong> ${formatearNumero(pedido.pz_pendientes, 0)}
           </p>
+
+          ${tablaPT_PedidoHTML}
+
+          <h3 class="sub-titulo">🧪 Insumos Requeridos</h3>
           <table>
             <thead>
               <tr>
@@ -1749,6 +1803,7 @@ async function imprimirConsolidado() {
               ${filasInsumosHTML}
             </tbody>
           </table>
+
           <div class="subtotal-pedido">
             <strong>Subtotal PO ${pedido.po}:</strong>
             <span>$${formatearNumero(pedido.total_comprar || 0)}</span>
@@ -1758,7 +1813,27 @@ async function imprimirConsolidado() {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // Sección 2: Consolidado final
+    // Sección 2: PT consolidado
+    // ═══════════════════════════════════════════════════════════════
+    let filasPT_Consolidadas = "";
+    let totCPed = 0, totCSur = 0, totCStock = 0, totCPend = 0;
+    for (const pt of ptConsolidado) {
+      totCPed += pt.pz_pedidas || 0;
+      totCSur += pt.pz_surtidas || 0;
+      totCStock += pt.pz_en_stock || 0;
+      totCPend += pt.pz_pendientes || 0;
+      filasPT_Consolidadas += `<tr>
+        <td class="codigo">${pt.pt_codigo}</td>
+        <td class="desc">${pt.descripcion || "—"}</td>
+        <td class="num">${formatearNumero(pt.pz_pedidas, 0)}</td>
+        <td class="num">${formatearNumero(pt.pz_surtidas, 0)}</td>
+        <td class="num stock">${formatearNumero(pt.pz_en_stock, 0)}</td>
+        <td class="num pend">${formatearNumero(pt.pz_pendientes, 0)}</td>
+      </tr>`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Sección 3: Insumos consolidados
     // ═══════════════════════════════════════════════════════════════
     let filasConsolidadasHTML = "";
     for (const e of insumosConsolidados) {
@@ -1779,58 +1854,90 @@ async function imprimirConsolidado() {
       </tr>`;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // HTML final
+    // ═══════════════════════════════════════════════════════════════
     const htmlImpresion = `<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <title>Consolidado General - Mediese</title>
 <style>
-  @page { size: A4; margin: 12mm; }
+  @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1A202C; padding: 20px; font-size: 11px; background: white; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1A202C; padding: 15px; font-size: 11px; background: white; }
 
   h1 { font-size: 22px; color: #1F4E79; margin-bottom: 4px; }
-  h2 { font-size: 14px; color: #1F4E79; margin: 20px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #1F4E79; }
+  h2 { font-size: 14px; color: #1F4E79; margin: 15px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #1F4E79; }
+  h3.sub-titulo { font-size: 12px; color: #1F4E79; margin: 12px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid #CBD5E0; }
 
   .encabezado { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1F4E79; padding-bottom: 12px; margin-bottom: 15px; }
   .encabezado-der { text-align: right; font-size: 11px; color: #4A5568; }
 
-  .resumen { display: flex; gap: 20px; background: #F9FAFB; border: 1px solid #E0E4EA; border-radius: 6px; padding: 10px 15px; margin-bottom: 15px; font-size: 11px; }
+  .resumen { display: flex; gap: 20px; background: #F9FAFB; border: 1px solid #E0E4EA; border-radius: 6px; padding: 10px 15px; margin-bottom: 15px; font-size: 11px; flex-wrap: wrap; }
   .resumen strong { color: #1F4E79; }
   .resumen .st-stock { color: #C00000; font-weight: 700; }
   .resumen .st-parcial { color: #B45309; font-weight: 700; }
   .resumen .st-ok { color: #1F7A1F; font-weight: 700; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 12px; table-layout: fixed; }
+  table { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 12px; table-layout: fixed; }
   thead { background: #1F4E79; color: white; display: table-header-group; }
-  th { padding: 6px 4px; font-weight: 600; font-size: 9px; text-transform: uppercase; text-align: center; word-wrap: break-word; }
+  th { padding: 5px 3px; font-weight: 600; font-size: 8px; text-transform: uppercase; text-align: center; word-wrap: break-word; }
   th:first-child, th:nth-child(2) { text-align: left; }
-  td { padding: 5px 4px; border-bottom: 1px solid #EEF1F5; text-align: center; vertical-align: middle; }
+  td { padding: 4px 3px; border-bottom: 1px solid #EEF1F5; text-align: center; vertical-align: middle; word-wrap: break-word; }
   td:first-child, td:nth-child(2) { text-align: left; }
   td.desc { text-align: left; word-wrap: break-word; }
   tr:nth-child(even) { background: #FAFBFD; }
-  td.codigo { font-family: "Courier New", monospace; font-weight: 700; color: #1F4E79; font-size: 9px; }
-  td.num { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.codigo { font-family: "Courier New", monospace; font-weight: 700; color: #1F4E79; font-size: 8px; }
+  td.num { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 9px; }
+  td.stock { color: #1F7A1F; font-weight: 600; }
+  td.pend { color: #B45309; font-weight: 700; }
   td.comprar { color: #C00000; font-weight: 700; }
   td.subtotal { color: #C00000; font-weight: 700; }
+  tr.fila-total { background: #F0F4FA; border-top: 2px solid #1F4E79; }
+  tr.fila-total td { font-weight: 700; font-size: 10px; }
 
-  .seccion-pedido { page-break-inside: avoid; margin-bottom: 25px; padding: 12px; border: 1px solid #E0E4EA; border-radius: 8px; }
-  .meta-pedido { font-size: 11px; color: #4A5568; margin-bottom: 8px; }
+  .seccion-pedido {
+    page-break-inside: avoid;
+    page-break-after: always;
+    margin-bottom: 20px;
+    padding: 10px;
+    border: 1px solid #E0E4EA;
+    border-radius: 8px;
+    display: block;
+    overflow: visible;
+  }
+  .seccion-pedido:last-of-type { page-break-after: auto; }
 
-  .subtotal-pedido { display: flex; justify-content: space-between; padding: 8px 12px; background: #F0F4FA; border-radius: 6px; margin-top: 8px; font-size: 12px; }
+  .meta-pedido { font-size: 10px; color: #4A5568; margin-bottom: 8px; line-height: 1.5; }
+
+  .subtotal-pedido {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #F0F4FA;
+    border-radius: 6px;
+    margin-top: 10px;
+    margin-bottom: 5px;
+    font-size: 12px;
+    page-break-inside: avoid;
+    page-break-after: avoid;
+    clear: both;
+  }
   .subtotal-pedido strong { color: #1F4E79; }
   .subtotal-pedido span { color: #C00000; font-weight: 700; font-size: 14px; }
 
-  .total-grande { font-size: 22px; color: #C00000; font-weight: 700; text-align: right; margin-top: 20px; padding: 20px; border-top: 3px solid #1F4E79; background: #F0F4FA; border-radius: 8px; }
+  .total-grande { font-size: 22px; color: #C00000; font-weight: 700; text-align: right; margin-top: 20px; padding: 20px; border-top: 3px solid #1F4E79; background: #F0F4FA; border-radius: 8px; page-break-inside: avoid; }
 
   .pie { margin-top: 20px; padding-top: 10px; border-top: 1px solid #E0E4EA; font-size: 10px; color: #718096; text-align: center; }
 
-  .sin-imprimir { display: block; margin: 0 auto 20px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .sin-imprimir { display: block; margin: 0 auto 15px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
   @media print {
     .sin-imprimir { display: none; }
     body { padding: 0; }
     .seccion-pedido { page-break-after: always; }
+    .seccion-pedido:last-of-type { page-break-after: auto; }
   }
 </style>
 </head>
@@ -1852,7 +1959,34 @@ async function imprimirConsolidado() {
   <h2 style="margin-top:0;">📋 Desglose por Pedido</h2>
   ${seccionesHTML}
 
-  <h2 style="page-break-before: always;">🧪 Consolidado Final (Todos los Pedidos)</h2>
+  <!-- ═══════════════════════════════════════════════════════════════
+       CONSOLIDADO FINAL
+       ═══════════════════════════════════════════════════════════════ -->
+  <h2 style="margin-top:40px;">📦 PT Consolidado (Todos los Pedidos)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Código OAR</th>
+        <th>Descripción</th>
+        <th>Pedidas</th>
+        <th>Surtidas</th>
+        <th>Stock PT</th>
+        <th>Pendientes</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filasPT_Consolidadas}
+      <tr class="fila-total">
+        <td colspan="2" style="text-align:right;">TOTAL:</td>
+        <td class="num">${formatearNumero(totCPed, 0)}</td>
+        <td class="num">${formatearNumero(totCSur, 0)}</td>
+        <td class="num stock">${formatearNumero(totCStock, 0)}</td>
+        <td class="num pend">${formatearNumero(totCPend, 0)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 style="margin-top:30px;">🧪 Insumos Consolidados (Todos los Pedidos)</h2>
   <div class="resumen">
     <div><strong>Total de insumos:</strong> ${data.total_insumos}</div>
     <div><span class="st-stock">❌ SIN STOCK:</span> ${data.insumos_sin_stock}</div>
