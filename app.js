@@ -1541,3 +1541,12 @@ function imprimirPedido() {
   ventana.document.write(htmlImpresion);
   ventana.document.close();
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// ALIAS DE COMPATIBILIDAD
+// Por si algún HTML viejo llama al nombre incorrecto
+// ═══════════════════════════════════════════════════════════════════
+
+window.refrescarStockPedidoData = refrescarStock;
+window.refrescarStockPedido = refrescarStock;
+window.refrescar_stock_pedido = refrescarStock;
