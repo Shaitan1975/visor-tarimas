@@ -1903,9 +1903,8 @@ async function imprimirConsolidado() {
   margin-bottom: 15px;
   padding: 10px;
   border: 1px solid #E0E4EA;
-  border-radius: 6px;
-  display: block;
-  overflow: visible;
+  border-radius: 8px;
+  page-break-before: auto;
 }
 
 .subtotal-pedido {
@@ -1964,8 +1963,9 @@ async function imprimirConsolidado() {
 @media print {
   .sin-imprimir { display: none; }
   body { padding: 0; }
-  .seccion-pedido { page-break-after: auto; }
   .seccion-pedido:not(:last-of-type) { page-break-after: always; }
+  .seccion-pedido:last-of-type { page-break-after: auto; }
+  h2 { page-break-after: avoid; }
 }
 </style>
 </head>
