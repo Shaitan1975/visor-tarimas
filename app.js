@@ -1924,22 +1924,39 @@ async function imprimirConsolidado() {
   .subtotal-pedido strong { color: #1F4E79; }
   .subtotal-pedido span { color: #C00000; font-weight: 700; font-size: 14px; }
 
-.total-grande {
-  font-size: 22px;
+  .total-grande {
+  font-size: 14px;
   color: #C00000;
   font-weight: 700;
   text-align: right;
-  margin-top: 20px;
-  padding: 20px;
-  border-top: 3px solid #1F4E79;
+  margin-top: 15px;
+  margin-bottom: 15px;
+  padding: 10px 15px;
+  border-top: 2px solid #1F4E79;
   background: #F0F4FA;
-  border-radius: 8px;
+  border-radius: 6px;
   page-break-inside: avoid;
   page-break-before: avoid;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   display: block;
   clear: both;
+  overflow: hidden;
 }
-  .pie { margin-top: 20px; padding-top: 10px; border-top: 1px solid #E0E4EA; font-size: 10px; color: #718096; text-align: center; }
+
+.pie {
+  margin-top: 15px;
+  padding-top: 8px;
+  border-top: 1px solid #E0E4EA;
+  font-size: 9px;
+  color: #718096;
+  text-align: center;
+  page-break-inside: avoid;
+  page-break-before: avoid;
+  width: 100%;
+  box-sizing: border-box;
+}
 
   .sin-imprimir { display: block; margin: 0 auto 15px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
