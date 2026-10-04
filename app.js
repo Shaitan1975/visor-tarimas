@@ -2037,7 +2037,7 @@ async function imprimirConsolidado() {
   </table>
 
   <div class="total-grande">
-    TOTAL A COMPRAR: $${formatearNumero(data.total_general)}
+  TOTAL A COMPRAR: <span style="font-size:16px;">$${formatearNumero(data.total_general)}</span>
   </div>
 
   <div class="pie">
