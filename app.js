@@ -1141,6 +1141,13 @@ async function abrirPedido(po) {
     const url = CONFIG.APPS_SCRIPT_URL + "?accion=ver_pedido&po=" + encodeURIComponent(po);
     const data = await llamarBackend(url);
     if (!data.ok) throw new Error(data.error || "Pedido no encontrado");
+
+    // 🔥 PROTECCIONES: garantizar que existan los campos
+    data.explosion = data.explosion || [];
+    data.skus = data.skus || [];
+    data.cedis = data.cedis || [];
+    data.resumen_pt = data.resumen_pt || [];
+
     pedidoActual = data;
     renderizarDetallePedido(data);
     mostrarPantalla("pantalla-detalle-pedido");
