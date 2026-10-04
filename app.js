@@ -1118,6 +1118,7 @@ async function guardarPedidoForm(evt) {
       skus: (resp.skus || []).map(s => ({
         sku: s.sku, cedis: s.cedis, pt_codigo: s.pt_codigo, pz: s.pz
       })),
+      resumen_pt: resp.resumen_pt || [],
       total_pz: skus.reduce((s, k) => s + k.pz, 0),
       explosion: resp.explosion || []
     };
