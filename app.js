@@ -1897,38 +1897,48 @@ async function imprimirConsolidado() {
   tr.fila-total { background: #F0F4FA; border-top: 2px solid #1F4E79; }
   tr.fila-total td { font-weight: 700; font-size: 10px; }
 
-  .seccion-pedido {
-    page-break-inside: avoid;
-    page-break-after: always;
-    margin-bottom: 20px;
-    padding: 10px;
-    border: 1px solid #E0E4EA;
-    border-radius: 8px;
-    display: block;
-    overflow: visible;
-  }
-  .seccion-pedido:last-of-type { page-break-after: auto; }
+.seccion-pedido {
+  page-break-inside: avoid;
+  page-break-after: always;
+  margin-bottom: 20px;
+  padding: 10px;
+  border: 1px solid #E0E4EA;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
 
-  .meta-pedido { font-size: 10px; color: #4A5568; margin-bottom: 8px; line-height: 1.5; }
-
-  .subtotal-pedido {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 12px;
-    background: #F0F4FA;
-    border-radius: 6px;
-    margin-top: 10px;
-    margin-bottom: 5px;
-    font-size: 12px;
-    page-break-inside: avoid;
-    page-break-after: avoid;
-    clear: both;
-  }
+.subtotal-pedido {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #F0F4FA;
+  border-radius: 6px;
+  margin-top: auto;
+  margin-bottom: 5px;
+  font-size: 12px;
+  page-break-inside: avoid;
+}
   .subtotal-pedido strong { color: #1F4E79; }
   .subtotal-pedido span { color: #C00000; font-weight: 700; font-size: 14px; }
 
-  .total-grande { font-size: 22px; color: #C00000; font-weight: 700; text-align: right; margin-top: 20px; padding: 20px; border-top: 3px solid #1F4E79; background: #F0F4FA; border-radius: 8px; page-break-inside: avoid; }
-
+.total-grande {
+  font-size: 22px;
+  color: #C00000;
+  font-weight: 700;
+  text-align: right;
+  margin-top: 20px;
+  padding: 20px;
+  border-top: 3px solid #1F4E79;
+  background: #F0F4FA;
+  border-radius: 8px;
+  page-break-inside: avoid;
+  page-break-before: avoid;
+  display: block;
+  clear: both;
+}
   .pie { margin-top: 20px; padding-top: 10px; border-top: 1px solid #E0E4EA; font-size: 10px; color: #718096; text-align: center; }
 
   .sin-imprimir { display: block; margin: 0 auto 15px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
