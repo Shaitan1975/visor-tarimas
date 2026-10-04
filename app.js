@@ -975,7 +975,7 @@ function renderizarListaPedidos(pedidos) {
   const estadoColor = { "PENDIENTE": "#B45309", "PARCIAL": "#1F4E79", "SURTIDO": "#1F7A1F", "CANCELADO": "#C00000" };
 
   let html = "<div style='margin-bottom:12px;'>";
-  html += `<button onclick="()" style="width:100%;padding:12px;background:#2C5282;color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">📊 Ver Consolidado General de Todos los Pedidos Activos</button>`;
+  html += `<button onclick="imprimirConsolidado()" style="width:100%;padding:12px;background:#2C5282;color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">📊 Ver Consolidado General de Todos los Pedidos Activos</button>`;
   html += "</div>";
 
   html += "<table style='width:100%;border-collapse:collapse;font-size:13px;'>"
@@ -1917,7 +1917,7 @@ async function imprimirConsolidado() {
     alert("Error: " + e.message);
   }
 }
- 
+
 
 // ═══════════════════════════════════════════════════════════════════
 // CARGA MASIVA DE PEDIDO DESDE EXCEL
