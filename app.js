@@ -1701,7 +1701,7 @@ async function imprimirConsolidado() {
     // ═══════════════════════════════════════════════════════════════
     let seccionesHTML = "";
 
-    for (const pedido of pedidos) {
+        for (const pedido of pedidos) {
       const fechaStr = formatearFecha(pedido.fecha);
 
       let filasInsumosHTML = "";
@@ -1713,7 +1713,7 @@ async function imprimirConsolidado() {
 
         filasInsumosHTML += `<tr>
           <td class="codigo">${e.insumo}</td>
-          <td>${e.descripcion || "—"}</td>
+          <td class="desc">${e.descripcion || "—"}</td>
           <td class="centro">${e.unidad || ""}</td>
           <td class="num">${formatearNumero(e.cantidad_necesaria)}</td>
           <td class="num">${formatearNumero(e.stock_actual)}</td>
@@ -1726,25 +1726,32 @@ async function imprimirConsolidado() {
       seccionesHTML += `
         <div class="seccion-pedido">
           <h2>📋 PO ${pedido.po}</h2>
-          <p style="font-size:11px;color:#4A5568;">
-            <strong>Fecha:</strong> ${fechaStr} ·
-            <strong>Pedidas:</strong> ${formatearNumero(pedido.pz_pedidas, 0)} PZ ·
-            <strong>Surtidas:</strong> ${formatearNumero(pedido.pz_surtidas, 0)} ·
+          <p class="meta-pedido">
+            <strong>Fecha:</strong> ${fechaStr} &nbsp;·&nbsp;
+            <strong>Pedidas:</strong> ${formatearNumero(pedido.pz_pedidas, 0)} PZ &nbsp;·&nbsp;
+            <strong>Surtidas:</strong> ${formatearNumero(pedido.pz_surtidas, 0)} &nbsp;·&nbsp;
             <strong>Pendientes:</strong> ${formatearNumero(pedido.pz_pendientes, 0)}
           </p>
           <table>
             <thead>
               <tr>
-                <th>Código</th><th>Descripción</th><th>Unidad</th>
-                <th>Necesario</th><th>Stock</th><th>Comprar</th>
-                <th>Subtotal</th><th>Estado</th>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th>Unidad</th>
+                <th>Necesario</th>
+                <th>Stock</th>
+                <th>Comprar</th>
+                <th>Subtotal</th>
+                <th>Estado</th>
               </tr>
             </thead>
-            <tbody>${filasInsumosHTML}</tbody>
+            <tbody>
+              ${filasInsumosHTML}
+            </tbody>
           </table>
           <div class="subtotal-pedido">
             <strong>Subtotal PO ${pedido.po}:</strong>
-            <span>$${formatearNumero(pedido.total_comprar)}</span>
+            <span>$${formatearNumero(pedido.total_comprar || 0)}</span>
           </div>
         </div>
       `;
