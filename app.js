@@ -974,7 +974,11 @@ function renderizarListaPedidos(pedidos) {
   const estadoIcon = { "PENDIENTE": "⏳", "PARCIAL": "🔄", "SURTIDO": "✅", "CANCELADO": "❌" };
   const estadoColor = { "PENDIENTE": "#B45309", "PARCIAL": "#1F4E79", "SURTIDO": "#1F7A1F", "CANCELADO": "#C00000" };
 
-  let html = "<table style='width:100%;border-collapse:collapse;font-size:13px;'>";
+  let html = "<div style='margin-bottom:12px;'>";
+  html += `<button onclick="imprimirConsolidado()" style="width:100%;padding:12px;background:#2C5282;color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">📊 Ver Consolidado General de Todos los Pedidos Activos</button>`;
+  html += "</div>";
+
+  html += "<table style='width:100%;border-collapse:collapse;font-size:13px;'>"
   html += "<thead><tr style='background:#f2f2f2;'>";
   html += "<th style='padding:8px;text-align:left;'>PO</th>";
   html += "<th>CEDIS</th>";
@@ -1180,6 +1184,63 @@ function renderizarDetallePedido(p) {
   const estadoIcon = { "PENDIENTE": "⏳", "PARCIAL": "🔄", "SURTIDO": "✅", "CANCELADO": "❌" };
   const estado = p.estado_pedido || "PENDIENTE";
 
+  // 🔥 NUEVA: Tabla PT
+  const resumenPT = p.resumen_pt || [];
+  let tablaPT_HTML = "";
+  if (resumenPT.length > 0) {
+    let totalesPedidas = 0;
+    let totalesSurtidas = 0;
+    let totalesEnStock = 0;
+    let totalesPendientes = 0;
+
+    let filas = "";
+    for (const pt of resumenPT) {
+      totalesPedidas += pt.pz_pedidas || 0;
+      totalesSurtidas += pt.pz_surtidas || 0;
+      totalesEnStock += pt.pz_en_stock || 0;
+      totalesPendientes += pt.pz_pendientes || 0;
+
+      filas += `<tr style="border-bottom:1px solid #eee;">
+        <td style="padding:6px;font-family:monospace;font-weight:600;color:#1F4E79;font-size:12px;">${pt.pt_codigo}</td>
+        <td style="padding:6px;font-size:11px;">${pt.descripcion || "—"}</td>
+        <td style="padding:6px;text-align:right;font-size:12px;">${formatearNumero(pt.pz_pedidas, 0)}</td>
+        <td style="padding:6px;text-align:right;font-size:12px;">${formatearNumero(pt.pz_surtidas, 0)}</td>
+        <td style="padding:6px;text-align:right;font-size:12px;color:#1F7A1F;font-weight:600;">${formatearNumero(pt.pz_en_stock, 0)}</td>
+        <td style="padding:6px;text-align:right;font-size:12px;${pt.pz_pendientes > 0 ? 'color:#B45309;font-weight:700;' : ''}">${formatearNumero(pt.pz_pendientes, 0)}</td>
+      </tr>`;
+    }
+
+    tablaPT_HTML = `
+      <div style="margin:15px 0;">
+        <h3 style="font-size:14px;color:#1F4E79;margin-bottom:8px;">📦 Resumen por Producto Terminado (PT)</h3>
+        <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:400px;">
+            <thead>
+              <tr style="background:#1F4E79;color:white;">
+                <th style="padding:6px;text-align:left;">Código OAR</th>
+                <th style="padding:6px;text-align:left;">Descripción</th>
+                <th style="padding:6px;text-align:right;">Pedidas</th>
+                <th style="padding:6px;text-align:right;">Surtidas</th>
+                <th style="padding:6px;text-align:right;">Stock PT</th>
+                <th style="padding:6px;text-align:right;">Pendientes</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filas}
+              <tr style="background:#F0F4FA;font-weight:700;">
+                <td colspan="2" style="padding:6px;text-align:right;">TOTAL:</td>
+                <td style="padding:6px;text-align:right;">${formatearNumero(totalesPedidas, 0)}</td>
+                <td style="padding:6px;text-align:right;">${formatearNumero(totalesSurtidas, 0)}</td>
+                <td style="padding:6px;text-align:right;color:#1F7A1F;">${formatearNumero(totalesEnStock, 0)}</td>
+                <td style="padding:6px;text-align:right;color:#B45309;">${formatearNumero(totalesPendientes, 0)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   document.getElementById("info-pedido").innerHTML = `
     <div class="detalle-info" style="margin:15px 0;padding:10px;background:#f9f9f9;border-radius:8px;">
       <p style="margin:0 0 6px 0;">
@@ -1194,7 +1255,9 @@ function renderizarDetallePedido(p) {
          <b>Pendientes:</b> <span style="color:#B45309;font-weight:700;">${formatearNumero(p.pz_pendientes_total || 0, 0)}</span></p>
       ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
       <p><b>Capturado:</b> ${formatearFecha(p.fecha_captura)} por ${p.usuario}</p>
-    </div>`;
+    </div>
+    ${tablaPT_HTML}
+  `;
 
   renderizarConsolidado(p.explosion);
   renderizarPorSKU(p.skus, p.explosion);
@@ -1617,6 +1680,159 @@ function imprimirPedido() {
   if (!ventana) { alert("Permite ventanas emergentes."); return; }
   ventana.document.write(htmlImpresion);
   ventana.document.close();
+}
+
+async function imprimirConsolidado() {
+  const cont = document.getElementById("lista-pedidos");
+  const original = cont.innerHTML;
+  cont.innerHTML = "<p>Cargando consolidado...</p>";
+
+  try {
+    const data = await llamarBackend(CONFIG.APPS_SCRIPT_URL + "?accion=consolidado_general");
+    if (!data.ok) throw new Error(data.error);
+
+    // Reconstruir la lista
+    cont.innerHTML = original;
+
+    // Generar PDF
+    const insumos = data.insumos || [];
+    const pedidos = data.pedidos || [];
+
+    let filasPedidosHTML = "";
+    for (const p of pedidos) {
+      filasPedidosHTML += `<tr style="border-bottom:1px solid #eee;">
+        <td style="padding:6px;font-family:monospace;font-weight:600;">${p.po}</td>
+        <td style="padding:6px;">${p.fecha}</td>
+        <td style="padding:6px;text-align:right;">${formatearNumero(p.pz_pedidas, 0)}</td>
+        <td style="padding:6px;text-align:right;">${formatearNumero(p.pz_surtidas, 0)}</td>
+        <td style="padding:6px;text-align:right;color:#B45309;font-weight:600;">${formatearNumero(p.pz_pendientes, 0)}</td>
+      </tr>`;
+    }
+
+    let filasInsumosHTML = "";
+    for (const e of insumos) {
+      const estadoIcon = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
+      const colorEstado = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
+      const comprarTxt = e.comprar > 0 ? formatearNumero(e.comprar) + " " + (e.unidad || "") : "—";
+      const subTxt = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
+
+      filasInsumosHTML += `<tr>
+        <td class="codigo">${e.insumo}</td>
+        <td>${e.descripcion || "—"}</td>
+        <td class="centro">${e.unidad || ""}</td>
+        <td class="num">${formatearNumero(e.cantidad_necesaria)}</td>
+        <td class="num">${formatearNumero(e.stock_actual)}</td>
+        <td class="num comprar">${comprarTxt}</td>
+        <td class="num">${formatearNumero(e.pu)}</td>
+        <td class="num">${formatearNumero(e.iva_tasa)}</td>
+        <td class="num subtotal">${subTxt}</td>
+        <td class="centro" style="color:${colorEstado};font-weight:700;">${estadoIcon}</td>
+      </tr>`;
+    }
+
+    const htmlImpresion = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Consolidado General - Mediese</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1A202C; padding: 20px; font-size: 11px; background: white; }
+  h1 { font-size: 22px; color: #1F4E79; margin-bottom: 4px; }
+  h2 { font-size: 14px; color: #1F4E79; margin: 20px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #1F4E79; }
+  .encabezado { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1F4E79; padding-bottom: 12px; margin-bottom: 15px; }
+  .encabezado-der { text-align: right; font-size: 11px; color: #4A5568; }
+  .resumen { display: flex; gap: 20px; background: #F9FAFB; border: 1px solid #E0E4EA; border-radius: 6px; padding: 10px 15px; margin-bottom: 15px; font-size: 11px; }
+  .resumen strong { color: #1F4E79; }
+  .resumen .st-stock { color: #C00000; font-weight: 700; }
+  .resumen .st-parcial { color: #B45309; font-weight: 700; }
+  .resumen .st-ok { color: #1F7A1F; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 20px; }
+  thead { background: #1F4E79; color: white; }
+  th { padding: 8px 5px; font-weight: 600; font-size: 9px; text-transform: uppercase; text-align: center; }
+  th:first-child, th:nth-child(2) { text-align: left; }
+  td { padding: 6px 5px; border-bottom: 1px solid #EEF1F5; text-align: center; }
+  td:first-child, td:nth-child(2) { text-align: left; }
+  tr:nth-child(even) { background: #FAFBFD; }
+  td.codigo { font-family: "Courier New", monospace; font-weight: 700; color: #1F4E79; }
+  td.num { text-align: center; }
+  td.comprar { color: #C00000; font-weight: 700; }
+  td.subtotal { color: #C00000; font-weight: 700; }
+  tr.fila-total { background: #F0F4FA; border-top: 2px solid #1F4E79; }
+  tr.fila-total td { font-weight: 700; font-size: 11px; padding: 10px 5px; }
+  .total-grande { font-size: 20px; color: #C00000; font-weight: 700; text-align: right; margin-top: 15px; padding-top: 15px; border-top: 3px solid #1F4E79; }
+  .pie { margin-top: 20px; padding-top: 10px; border-top: 1px solid #E0E4EA; font-size: 10px; color: #718096; text-align: center; }
+  .sin-imprimir { display: block; margin: 0 auto 20px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  @media print { .sin-imprimir { display: none; } body { padding: 0; } }
+</style>
+</head>
+<body>
+  <button class="sin-imprimir" onclick="window.print()">🖨️ Imprimir o Guardar como PDF</button>
+
+  <div class="encabezado">
+    <div>
+      <h1>Consolidado General</h1>
+      <p style="font-size:12px;color:#4A5568;"><strong>Pedidos activos:</strong> ${data.total_pedidos}</p>
+      <p style="font-size:12px;color:#4A5568;"><strong>Generado:</strong> ${data.fecha_generacion}</p>
+    </div>
+    <div class="encabezado-der">
+      <p>Mediese</p>
+      <p>Sistema Visor Tarimas</p>
+    </div>
+  </div>
+
+  <h2>📋 Pedidos Activos</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>PO</th>
+        <th>Fecha Captura</th>
+        <th>Pedidas</th>
+        <th>Surtidas</th>
+        <th>Pendientes</th>
+      </tr>
+    </thead>
+    <tbody>${filasPedidosHTML}</tbody>
+  </table>
+
+  <h2>🧪 Insumos Consolidados (Compra Total)</h2>
+  <div class="resumen">
+    <div><strong>Total de insumos:</strong> ${data.total_insumos}</div>
+    <div><span class="st-stock">❌ SIN STOCK:</span> ${data.insumos_sin_stock}</div>
+    <div><span class="st-parcial">⚠️ PARCIALES:</span> ${data.insumos_parciales}</div>
+    <div><span class="st-ok">✅ OK:</span> ${data.insumos_ok}</div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Código</th><th>Descripción</th><th>Unidad</th>
+        <th>Necesario</th><th>Stock</th><th>Comprar</th>
+        <th>PU</th><th>IVA</th><th>Subtotal</th><th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>${filasInsumosHTML}</tbody>
+  </table>
+
+  <div class="total-grande">
+    TOTAL A COMPRAR: $${formatearNumero(data.total_general)}
+  </div>
+
+  <div class="pie">
+    Sistema Visor Tarimas - Mediese · ${data.fecha_generacion}
+  </div>
+</body>
+</html>`;
+
+    const ventana = window.open("", "_blank");
+    if (!ventana) { alert("Permite ventanas emergentes."); return; }
+    ventana.document.write(htmlImpresion);
+    ventana.document.close();
+
+  } catch (e) {
+    cont.innerHTML = original;
+    alert("Error: " + e.message);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════
