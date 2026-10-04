@@ -1434,19 +1434,23 @@ function imprimirPedido() {
   let filasPT_HTML = "";
   let totalPedidas = 0;
   let totalSurtidas = 0;
+  let totalEnStock = 0;
   let totalPendientes = 0;
 
   for (const pt of resumenPT) {
-    const totalSurtidasPT = (pt.pz_surtidas || 0) + (pt.pz_en_stock || 0);
+    const surtidas = pt.pz_surtidas || 0;
+    const enStock = pt.pz_en_stock || 0;
     totalPedidas += pt.pz_pedidas || 0;
-    totalSurtidas += totalSurtidasPT;
+    totalSurtidas += surtidas;
+    totalEnStock += enStock;
     totalPendientes += pt.pz_pendientes || 0;
 
     filasPT_HTML += `<tr>
       <td class="codigo">${pt.pt_codigo}</td>
       <td>${pt.descripcion || "—"}</td>
       <td class="num">${formatearNumero(pt.pz_pedidas, 0)}</td>
-      <td class="num">${formatearNumero(totalSurtidasPT, 0)}</td>
+      <td class="num">${formatearNumero(surtidas, 0)}</td>
+      <td class="num" style="color:#1F7A1F;font-weight:600;">${formatearNumero(enStock, 0)}</td>
       <td class="num ${pt.pz_pendientes > 0 ? 'pendiente' : ''}">${formatearNumero(pt.pz_pendientes, 0)}</td>
     </tr>`;
   }
@@ -1557,13 +1561,14 @@ function imprimirPedido() {
        ═══════════════════════════════════════════════════════════════ -->
   ${resumenPT.length > 0 ? `
   <div class="seccion-titulo">📦 Resumen por Producto Terminado (PT)</div>
-  <table>
+    <table>
     <thead>
       <tr>
         <th>Código OAR</th>
         <th>Descripción</th>
         <th>Pedidas</th>
         <th>Surtidas</th>
+        <th>Stock PT</th>
         <th>Pendientes</th>
       </tr>
     </thead>
@@ -1573,6 +1578,7 @@ function imprimirPedido() {
         <td colspan="2" style="text-align:right;font-weight:700;">TOTAL:</td>
         <td class="num" style="font-weight:700;">${formatearNumero(totalPedidas, 0)}</td>
         <td class="num" style="font-weight:700;">${formatearNumero(totalSurtidas, 0)}</td>
+        <td class="num" style="font-weight:700;color:#1F7A1F;">${formatearNumero(totalEnStock, 0)}</td>
         <td class="num pendiente" style="font-weight:700;">${formatearNumero(totalPendientes, 0)}</td>
       </tr>
     </tbody>
