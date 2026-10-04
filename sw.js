@@ -2,7 +2,7 @@
 // SERVICE WORKER - Visor Tarimas v8
 // ═══════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'visor-v31';   
+const CACHE_VERSION = 'visor-v32';   
 const CACHE_NAME = CACHE_VERSION;
 
 const ARCHIVOS_CACHE = [
