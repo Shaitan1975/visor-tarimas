@@ -1420,51 +1420,26 @@ function imprimirPedido() {
   const oks = ordenados.filter(i => i.estado === "OK").length;
 
   // ═══════════════════════════════════════════════════════════════
-  // 🔥 NUEVO: Calcular piezas por PT (Producto Terminado)
+  // 🔥 NUEVO: Resumen por PT (Producto Terminado)
   // ═══════════════════════════════════════════════════════════════
-  const pzPorPT = {};
-  for (const s of (p.skus || [])) {
-    const pt = s.pt_codigo || "SIN_PT";
-    if (!pzPorPT[pt]) {
-      pzPorPT[pt] = {
-        pt_codigo: pt,
-        pz_pedidas: 0,
-      };
-    }
-    pzPorPT[pt].pz_pedidas += Number(s.pz) || 0;
-  }
-
-  // Agregar salidas/stock/pendientes por PT
-  // Necesitamos los datos de debug_salidas o similar. Los inferimos del pedido:
-  const ptArray = Object.values(pzPorPT);
-
-  // Calcular surtidas/pendientes por PT proporcionalmente
-  // Nota: si ya tienes los datos exactos desde el backend, úsalos.
-  // Por ahora usamos los campos agregados del pedido.
-  const totalPZ = p.pz_pedidas_total || 1;
-  const factor = (p.pz_surtidas_total || 0) / totalPZ;
-
+  const resumenPT = p.resumen_pt || [];
   let filasPT_HTML = "";
   let totalPedidas = 0;
   let totalSurtidas = 0;
   let totalPendientes = 0;
 
-  for (const pt of ptArray) {
-    const descripcion = (pedidoActual.skus.find(s => s.pt_codigo === pt.pt_codigo) || {}).pt_desc || "";
-    const pzPedidas = pt.pz_pedidas;
-    const pzSurtidas = Math.round(pzPedidas * factor);
-    const pzPendientes = pzPedidas - pzSurtidas;
-
-    totalPedidas += pzPedidas;
-    totalSurtidas += pzSurtidas;
-    totalPendientes += pzPendientes;
+  for (const pt of resumenPT) {
+    const totalSurtidasPT = (pt.pz_surtidas || 0) + (pt.pz_en_stock || 0);
+    totalPedidas += pt.pz_pedidas || 0;
+    totalSurtidas += totalSurtidasPT;
+    totalPendientes += pt.pz_pendientes || 0;
 
     filasPT_HTML += `<tr>
       <td class="codigo">${pt.pt_codigo}</td>
-      <td>${descripcion || "—"}</td>
-      <td class="num">${formatearNumero(pzPedidas, 0)}</td>
-      <td class="num">${formatearNumero(pzSurtidas, 0)}</td>
-      <td class="num ${pzPendientes > 0 ? 'pendiente' : ''}">${formatearNumero(pzPendientes, 0)}</td>
+      <td>${pt.descripcion || "—"}</td>
+      <td class="num">${formatearNumero(pt.pz_pedidas, 0)}</td>
+      <td class="num">${formatearNumero(totalSurtidasPT, 0)}</td>
+      <td class="num ${pt.pz_pendientes > 0 ? 'pendiente' : ''}">${formatearNumero(pt.pz_pendientes, 0)}</td>
     </tr>`;
   }
 
@@ -1572,6 +1547,7 @@ function imprimirPedido() {
   <!-- ═══════════════════════════════════════════════════════════════
        SECCIÓN 1: RESUMEN POR PRODUCTO TERMINADO (PT)
        ═══════════════════════════════════════════════════════════════ -->
+  ${resumenPT.length > 0 ? `
   <div class="seccion-titulo">📦 Resumen por Producto Terminado (PT)</div>
   <table>
     <thead>
@@ -1593,6 +1569,7 @@ function imprimirPedido() {
       </tr>
     </tbody>
   </table>
+  ` : ''}
 
   <!-- ═══════════════════════════════════════════════════════════════
        SECCIÓN 2: DETALLE DE INSUMOS
