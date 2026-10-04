@@ -1836,6 +1836,148 @@ async function imprimirConsolidado() {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// CARGA MASIVA DE PEDIDO DESDE EXCEL
+// ═══════════════════════════════════════════════════════════════════
+
+const MAPEO_SABOR_SKU = {
+  "ORIG": "MK150",
+  "ORIGINAL": "MK150",
+  "OR": "MK150",
+  "LIME": "MKLM150",
+  "LIMON": "MKLM150",
+  "LIM": "MKLM150",
+  "CHILI": "MKCH150",
+  "CHILE": "MKCH150",
+  "CHILES": "MKCH150",
+  "CH": "MKCH150",
+};
+
+function abrirCargaMasiva() {
+  document.getElementById("masivo-po").value = "";
+  document.getElementById("masivo-texto").value = "";
+  document.getElementById("masivo-status").textContent = "";
+  document.getElementById("masivo-status").className = "send-status";
+  mostrarPantalla("pantalla-carga-masiva");
+}
+
+function cerrarCargaMasiva() {
+  mostrarPantalla("pantalla-form-pedido");
+}
+
+function procesarCargaMasiva() {
+  const statusEl = document.getElementById("masivo-status");
+  const po = document.getElementById("masivo-po").value.trim();
+  const texto = document.getElementById("masivo-texto").value;
+
+  // Reset
+  statusEl.textContent = "";
+  statusEl.className = "send-status";
+
+  if (!po) {
+    statusEl.textContent = "❌ Falta PO";
+    statusEl.className = "send-status error";
+    return;
+  }
+
+  if (!texto.trim()) {
+    statusEl.textContent = "❌ No hay datos para procesar";
+    statusEl.className = "send-status error";
+    return;
+  }
+
+  // Parsear
+  const lineas = texto.split("\n");
+  let saborActual = null;
+  const skus = [];
+  const errores = [];
+  let duplicados = 0;
+
+  for (let i = 0; i < lineas.length; i++) {
+    const linea = lineas[i].trim();
+    if (!linea) continue;
+
+    const lineaUpper = linea.toUpperCase();
+
+    // Detectar encabezado de sabor (solo la palabra)
+    if (lineaUpper.length <= 15 && MAPEO_SABOR_SKU[lineaUpper]) {
+      saborActual = MAPEO_SABOR_SKU[lineaUpper];
+      continue;
+    }
+
+    // Detectar línea de datos: "00014917931-99001  5200" (tabs o espacios)
+    const partes = linea.split(/\s+/).filter(p => p);
+    if (partes.length >= 2) {
+      const matchData = partes[0].match(/^0*(\d+)-(\d+)$/);
+      const pz = parseInt(partes[1].replace(/,/g, ""));
+
+      if (matchData && !isNaN(pz) && pz > 0) {
+        if (!saborActual) {
+          errores.push(`Línea ${i + 1}: Falta encabezado (ORIG/LIME/CHILI) antes de la línea`);
+          continue;
+        }
+
+        const cedisFull = matchData[2]; // 99001
+        const cedisNum = cedisFull.length >= 3
+          ? cedisFull.slice(-3)
+          : cedisFull.padStart(3, "0");
+
+        skus.push({
+          sku: saborActual,
+          cedis: cedisNum,
+          pz: pz,
+        });
+        continue;
+      }
+    }
+
+    // Línea no reconocida
+    errores.push(`Línea ${i + 1}: Formato inválido "${linea}"`);
+  }
+
+  if (skus.length === 0) {
+    statusEl.innerHTML = "❌ No se procesó ninguna línea.<br>" + errores.slice(0, 5).join("<br>");
+    statusEl.className = "send-status error";
+    return;
+  }
+
+  // Consolidar duplicados (mismo SKU + CEDIS)
+  const consolidado = {};
+  for (const s of skus) {
+    const key = s.sku + "|" + s.cedis;
+    if (consolidado[key]) {
+      duplicados++;
+    }
+    consolidado[key] = s;
+  }
+  const skusFinales = Object.values(consolidado);
+
+  // Cargar al formulario temporal
+  skusFormTemporal = skusFinales.map(s => ({
+    sku: s.sku,
+    cedis: s.cedis,
+    pz: s.pz,
+  }));
+
+  // Llenar el formulario de pedido
+  document.getElementById("form-po").value = po;
+  document.getElementById("titulo-form-pedido").textContent = "Nuevo pedido (carga masiva)";
+
+  // Renderizar la tabla de SKUs
+  renderizarSKUsForm();
+
+  // Volver al formulario
+  mostrarPantalla("pantalla-form-pedido");
+
+  // Status final
+  const statusForm = document.getElementById("form-pedido-status");
+  statusForm.innerHTML = `✅ ${skusFinales.length} líneas cargadas` +
+    (duplicados > 0 ? ` (${duplicados} consolidadas)` : "") +
+    (errores.length > 0 ? `<br>⚠️ ${errores.length} errores: ${errores.slice(0, 3).join(", ")}` : "") +
+    `<br><b>Revisa y presiona "Guardar y calcular"</b>`;
+  statusForm.className = "send-status ok";
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // ALIAS DE COMPATIBILIDAD
 // Por si algún HTML viejo llama al nombre incorrecto
 // ═══════════════════════════════════════════════════════════════════
