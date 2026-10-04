@@ -1419,6 +1419,58 @@ function imprimirPedido() {
   const parciales = ordenados.filter(i => i.estado === "PARCIAL").length;
   const oks = ordenados.filter(i => i.estado === "OK").length;
 
+  // ═══════════════════════════════════════════════════════════════
+  // 🔥 NUEVO: Calcular piezas por PT (Producto Terminado)
+  // ═══════════════════════════════════════════════════════════════
+  const pzPorPT = {};
+  for (const s of (p.skus || [])) {
+    const pt = s.pt_codigo || "SIN_PT";
+    if (!pzPorPT[pt]) {
+      pzPorPT[pt] = {
+        pt_codigo: pt,
+        pz_pedidas: 0,
+      };
+    }
+    pzPorPT[pt].pz_pedidas += Number(s.pz) || 0;
+  }
+
+  // Agregar salidas/stock/pendientes por PT
+  // Necesitamos los datos de debug_salidas o similar. Los inferimos del pedido:
+  const ptArray = Object.values(pzPorPT);
+
+  // Calcular surtidas/pendientes por PT proporcionalmente
+  // Nota: si ya tienes los datos exactos desde el backend, úsalos.
+  // Por ahora usamos los campos agregados del pedido.
+  const totalPZ = p.pz_pedidas_total || 1;
+  const factor = (p.pz_surtidas_total || 0) / totalPZ;
+
+  let filasPT_HTML = "";
+  let totalPedidas = 0;
+  let totalSurtidas = 0;
+  let totalPendientes = 0;
+
+  for (const pt of ptArray) {
+    const descripcion = (pedidoActual.skus.find(s => s.pt_codigo === pt.pt_codigo) || {}).pt_desc || "";
+    const pzPedidas = pt.pz_pedidas;
+    const pzSurtidas = Math.round(pzPedidas * factor);
+    const pzPendientes = pzPedidas - pzSurtidas;
+
+    totalPedidas += pzPedidas;
+    totalSurtidas += pzSurtidas;
+    totalPendientes += pzPendientes;
+
+    filasPT_HTML += `<tr>
+      <td class="codigo">${pt.pt_codigo}</td>
+      <td>${descripcion || "—"}</td>
+      <td class="num">${formatearNumero(pzPedidas, 0)}</td>
+      <td class="num">${formatearNumero(pzSurtidas, 0)}</td>
+      <td class="num ${pzPendientes > 0 ? 'pendiente' : ''}">${formatearNumero(pzPendientes, 0)}</td>
+    </tr>`;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // Filas de insumos
+  // ═══════════════════════════════════════════════════════════════
   let filasHTML = "";
   let totalGeneral = 0;
   for (const e of ordenados) {
@@ -1477,7 +1529,7 @@ function imprimirPedido() {
   .resumen .st-stock { color: #C00000; font-weight: 700; }
   .resumen .st-parcial { color: #B45309; font-weight: 700; }
   .resumen .st-ok { color: #1F7A1F; font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 20px; }
   thead { background: #1F4E79; color: white; }
   th { padding: 8px 5px; font-weight: 600; font-size: 9px; text-transform: uppercase; text-align: center; }
   th:first-child, th:nth-child(2) { text-align: left; }
@@ -1486,10 +1538,12 @@ function imprimirPedido() {
   tr:nth-child(even) { background: #FAFBFD; }
   td.codigo { font-family: "Courier New", monospace; font-weight: 700; color: #1F4E79; }
   td.num { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.pendiente { color: #B45309; font-weight: 700; }
   td.comprar { color: #C00000; font-weight: 700; }
   td.subtotal { color: #C00000; font-weight: 700; }
   tr.fila-total { background: #F0F4FA; border-top: 2px solid #1F4E79; }
   tr.fila-total td { font-weight: 700; font-size: 11px; padding: 10px 5px; }
+  .seccion-titulo { font-size: 14px; color: #1F4E79; font-weight: 700; margin: 20px 0 10px 0; padding-bottom: 6px; border-bottom: 2px solid #1F4E79; }
   .pie { margin-top: 20px; padding-top: 10px; border-top: 1px solid #E0E4EA; font-size: 10px; color: #718096; text-align: center; }
   .sin-imprimir { display: block; margin: 0 auto 20px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
   @media print { .sin-imprimir { display: none; } body { padding: 0; } }
@@ -1497,6 +1551,7 @@ function imprimirPedido() {
 </head>
 <body>
   <button class="sin-imprimir" onclick="window.print()">🖨️ Imprimir o Guardar como PDF</button>
+  
   <div class="encabezado">
     <div class="encabezado-izq">
       <h1>Pedido de Insumos</h1>
@@ -1513,6 +1568,36 @@ function imprimirPedido() {
       <p>Sistema Visor Tarimas</p>
     </div>
   </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SECCIÓN 1: RESUMEN POR PRODUCTO TERMINADO (PT)
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="seccion-titulo">📦 Resumen por Producto Terminado (PT)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Código OAR</th>
+        <th>Descripción</th>
+        <th>Pedidas</th>
+        <th>Surtidas</th>
+        <th>Pendientes</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${filasPT_HTML}
+      <tr class="fila-total">
+        <td colspan="2" style="text-align:right;font-weight:700;">TOTAL:</td>
+        <td class="num" style="font-weight:700;">${formatearNumero(totalPedidas, 0)}</td>
+        <td class="num" style="font-weight:700;">${formatearNumero(totalSurtidas, 0)}</td>
+        <td class="num pendiente" style="font-weight:700;">${formatearNumero(totalPendientes, 0)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ═══════════════════════════════════════════════════════════════
+       SECCIÓN 2: DETALLE DE INSUMOS
+       ═══════════════════════════════════════════════════════════════ -->
+  <div class="seccion-titulo">🧪 Detalle de Insumos Requeridos</div>
   <div class="resumen">
     <div><strong>Total de insumos:</strong> ${total}</div>
     <div><span class="st-stock">❌ SIN STOCK:</span> ${sinStock}</div>
@@ -1530,6 +1615,7 @@ function imprimirPedido() {
     </thead>
     <tbody>${filasHTML}</tbody>
   </table>
+
   <div class="pie">
     Generado el ${new Date().toLocaleString("es-MX")} · Sistema Visor Tarimas - Mediese
   </div>
