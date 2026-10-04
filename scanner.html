@@ -264,6 +264,9 @@
       <h3 style="margin-top:20px;">SKUs</h3>
       <div id="lista-skus-form"></div>
       <button class="btn-secondary" onclick="agregarFilaSKU()" style="margin-top:8px;width:100%;">+ Agregar SKU</button>
+      <button class="btn-secondary" onclick="abrirCargaMasiva()" style="margin-top:8px;width:100%;">
+      📋 Pegar pedido masivo (Excel)
+      </button>
 
       <p id="form-pedido-status" class="send-status"></p>
 
@@ -302,6 +305,46 @@
       </div>
     </div>
   </section>
+  <!-- PANTALLA: Carga Masiva de Pedido -->
+<section id="pantalla-carga-masiva" class="view-section hidden">
+  <div class="manual-container">
+    <div class="estatus-header">
+      <h2>📋 Carga Masiva de Pedido</h2>
+      <button onclick="cerrarCargaMasiva()" class="btn-cerrar">✖</button>
+    </div>
+
+    <p class="manual-descripcion">
+      Pega las 3 hojas del Excel (una debajo de otra).<br>
+      <b>Formato por línea:</b> <code style="font-size:11px;background:#f0f0f0;padding:2px 4px;">PO#-CEDIS  PZ</code><br>
+      <b>Encabezados de sabor:</b> <code style="font-size:11px;background:#f0f0f0;padding:2px 4px;">ORIG</code> / <code style="font-size:11px;background:#f0f0f0;padding:2px 4px;">LIME</code> / <code style="font-size:11px;background:#f0f0f0;padding:2px 4px;">CHILI</code>
+    </p>
+
+    <div class="input-group">
+      <label for="masivo-po">PO</label>
+      <input type="text" id="masivo-po" placeholder="14917931" inputmode="numeric">
+    </div>
+
+    <div class="input-group">
+      <label for="masivo-texto">Pegar aquí (con los encabezados de sabor):</label>
+      <textarea id="masivo-texto" rows="15" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:6px;font-family:monospace;font-size:11px;box-sizing:border-box;" placeholder="ORIG
+00014917931-99001	5200
+00014917931-99003	26000
+...
+LIME
+00014917931-99003	15600
+...
+CHILI
+00014917931-99001	5200
+..."></textarea>
+    </div>
+
+    <p id="masivo-status" class="send-status"></p>
+
+    <button class="btn-primary btn-large" onclick="procesarCargaMasiva()" style="margin-top:12px;">
+      ✅ Procesar y revisar
+    </button>
+  </div>
+</section>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
