@@ -1899,13 +1899,12 @@ async function imprimirConsolidado() {
 
 .seccion-pedido {
   page-break-inside: avoid;
-  page-break-after: always;
-  margin-bottom: 20px;
+  page-break-after: auto;
+  margin-bottom: 15px;
   padding: 10px;
   border: 1px solid #E0E4EA;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
+  border-radius: 6px;
+  display: block;
   overflow: visible;
 }
 
@@ -1913,18 +1912,22 @@ async function imprimirConsolidado() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: 6px 10px;
   background: #F0F4FA;
-  border-radius: 6px;
-  margin-top: auto;
-  margin-bottom: 5px;
-  font-size: 12px;
+  border-radius: 4px;
+  margin-top: 6px;
+  margin-bottom: 0;
+  font-size: 11px;
   page-break-inside: avoid;
+  page-break-after: avoid;
+  clear: both;
+  width: 100%;
+  box-sizing: border-box;
 }
   .subtotal-pedido strong { color: #1F4E79; }
   .subtotal-pedido span { color: #C00000; font-weight: 700; font-size: 14px; }
 
-  .total-grande {
+.total-grande {
   font-size: 14px;
   color: #C00000;
   font-weight: 700;
@@ -1942,9 +1945,7 @@ async function imprimirConsolidado() {
   box-sizing: border-box;
   display: block;
   clear: both;
-  overflow: hidden;
 }
-
 .pie {
   margin-top: 15px;
   padding-top: 8px;
@@ -1960,12 +1961,12 @@ async function imprimirConsolidado() {
 
   .sin-imprimir { display: block; margin: 0 auto 15px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
-  @media print {
-    .sin-imprimir { display: none; }
-    body { padding: 0; }
-    .seccion-pedido { page-break-after: always; }
-    .seccion-pedido:last-of-type { page-break-after: auto; }
-  }
+@media print {
+  .sin-imprimir { display: none; }
+  body { padding: 0; }
+  .seccion-pedido { page-break-after: auto; }
+  .seccion-pedido:not(:last-of-type) { page-break-after: always; }
+}
 </style>
 </head>
 <body>
@@ -1983,8 +1984,16 @@ async function imprimirConsolidado() {
     </div>
   </div>
 
-  <h2 style="margin-top:0;">📋 Desglose por Pedido</h2>
+    <h2 style="margin-top:0;">📋 Desglose por Pedido</h2>
   ${seccionesHTML}
+
+  <h2 style="margin-top:30px;">🧪 Consolidado Final (Todos los Pedidos)</h2>
+  <div class="resumen">
+    <div><strong>Total de insumos:</strong> ${data.total_insumos}</div>
+    <div><span class="st-stock">❌ SIN STOCK:</span> ${data.insumos_sin_stock}</div>
+    <div><span class="st-parcial">⚠️ PARCIALES:</span> ${data.insumos_parciales}</div>
+    <div><span class="st-ok">✅ OK:</span> ${data.insumos_ok}</div>
+  </div>
 
   <!-- ═══════════════════════════════════════════════════════════════
        CONSOLIDADO FINAL
