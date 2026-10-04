@@ -975,7 +975,7 @@ function renderizarListaPedidos(pedidos) {
   const estadoColor = { "PENDIENTE": "#B45309", "PARCIAL": "#1F4E79", "SURTIDO": "#1F7A1F", "CANCELADO": "#C00000" };
 
   let html = "<div style='margin-bottom:12px;'>";
-  html += `<button onclick="imprimirConsolidado()" style="width:100%;padding:12px;background:#2C5282;color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">📊 Ver Consolidado General de Todos los Pedidos Activos</button>`;
+  html += `<button onclick="()" style="width:100%;padding:12px;background:#2C5282;color:white;border:none;border-radius:6px;font-weight:600;cursor:pointer;font-size:14px;">📊 Ver Consolidado General de Todos los Pedidos Activos</button>`;
   html += "</div>";
 
   html += "<table style='width:100%;border-collapse:collapse;font-size:13px;'>"
@@ -1690,139 +1690,43 @@ async function imprimirConsolidado() {
   try {
     const data = await llamarBackend(CONFIG.APPS_SCRIPT_URL + "?accion=consolidado_general");
     if (!data.ok) throw new Error(data.error);
-
     cont.innerHTML = original;
 
     const pedidos = data.pedidos || [];
     const insumosConsolidados = data.insumos_consolidados || [];
     const ptConsolidado = data.pt_consolidado || [];
 
-    // ═══════════════════════════════════════════════════════════════
-    // Sección 1: Detalle por pedido
-    // ═══════════════════════════════════════════════════════════════
-    let seccionesHTML = "";
+    // ─── Anchos fijos de columnas (suman 100%) ───────────────────────
+    const COLS_PT = `<colgroup>
+      <col style="width:14%"><col style="width:34%"><col style="width:13%">
+      <col style="width:13%"><col style="width:13%"><col style="width:13%">
+    </colgroup>`;
+    const COLS_INS = `<colgroup>
+      <col style="width:14%"><col style="width:26%"><col style="width:7%"><col style="width:11%">
+      <col style="width:10%"><col style="width:12%"><col style="width:12%"><col style="width:8%">
+    </colgroup>`;
 
-    for (const pedido of pedidos) {
-      const fechaStr = formatearFecha(pedido.fecha);
+    const HEAD_PT = `<thead><tr>
+      <th>Código OAR</th><th>Descripción</th><th>Pedidas</th>
+      <th>Surtidas</th><th>Stock PT</th><th>Pendientes</th>
+    </tr></thead>`;
+    const HEAD_INS = `<thead><tr>
+      <th>Código</th><th>Descripción</th><th>Unidad</th><th>Necesario</th>
+      <th>Stock</th><th>Comprar</th><th>Subtotal</th><th>Estado</th>
+    </tr></thead>`;
 
-      // 🔥 Tabla PT por pedido
-      let filasPT_Pedido = "";
-      let totPed = 0, totSur = 0, totStock = 0, totPend = 0;
-      for (const pt of (pedido.pt || [])) {
-        totPed += pt.pz_pedidas || 0;
-        totSur += pt.pz_surtidas || 0;
-        totStock += pt.pz_en_stock || 0;
-        totPend += pt.pz_pendientes || 0;
-        filasPT_Pedido += `<tr>
-          <td class="codigo">${pt.pt_codigo}</td>
-          <td class="desc">${pt.descripcion || "—"}</td>
-          <td class="num">${formatearNumero(pt.pz_pedidas, 0)}</td>
-          <td class="num">${formatearNumero(pt.pz_surtidas, 0)}</td>
-          <td class="num stock">${formatearNumero(pt.pz_en_stock, 0)}</td>
-          <td class="num pend">${formatearNumero(pt.pz_pendientes, 0)}</td>
-        </tr>`;
-      }
-
-      let tablaPT_PedidoHTML = "";
-      if ((pedido.pt || []).length > 0) {
-        tablaPT_PedidoHTML = `
-          <h3 class="sub-titulo">📦 Producto Terminado (PT)</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Código OAR</th>
-                <th>Descripción</th>
-                <th>Pedidas</th>
-                <th>Surtidas</th>
-                <th>Stock PT</th>
-                <th>Pendientes</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filasPT_Pedido}
-              <tr class="fila-total">
-                <td colspan="2" style="text-align:right;">TOTAL:</td>
-                <td class="num">${formatearNumero(totPed, 0)}</td>
-                <td class="num">${formatearNumero(totSur, 0)}</td>
-                <td class="num stock">${formatearNumero(totStock, 0)}</td>
-                <td class="num pend">${formatearNumero(totPend, 0)}</td>
-              </tr>
-            </tbody>
-          </table>
-        `;
-      }
-
-      // Tabla de insumos
-      let filasInsumosHTML = "";
-      for (const e of pedido.insumos) {
-        const estadoIcon = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
-        const colorEstado = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
-        const comprarTxt = e.comprar > 0 ? formatearNumero(e.comprar) + " " + (e.unidad || "") : "—";
-        const subTxt = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
-
-        filasInsumosHTML += `<tr>
-          <td class="codigo">${e.insumo}</td>
-          <td class="desc">${e.descripcion || "—"}</td>
-          <td class="centro">${e.unidad || ""}</td>
-          <td class="num">${formatearNumero(e.cantidad_necesaria)}</td>
-          <td class="num">${formatearNumero(e.stock_actual)}</td>
-          <td class="num comprar">${comprarTxt}</td>
-          <td class="num subtotal">${subTxt}</td>
-          <td class="centro" style="color:${colorEstado};font-weight:700;">${estadoIcon}</td>
-        </tr>`;
-      }
-
-      seccionesHTML += `
-        <div class="seccion-pedido">
-          <h2>📋 PO ${pedido.po}</h2>
-          <p class="meta-pedido">
-            <strong>Fecha:</strong> ${fechaStr} &nbsp;·&nbsp;
-            <strong>Pedidas:</strong> ${formatearNumero(pedido.pz_pedidas, 0)} PZ &nbsp;·&nbsp;
-            <strong>Surtidas:</strong> ${formatearNumero(pedido.pz_surtidas, 0)} &nbsp;·&nbsp;
-            <strong>En Stock PT:</strong> <span style="color:#1F7A1F;font-weight:700;">${formatearNumero(pedido.pz_en_stock, 0)}</span> &nbsp;·&nbsp;
-            <strong>Pendientes:</strong> ${formatearNumero(pedido.pz_pendientes, 0)}
-          </p>
-
-          ${tablaPT_PedidoHTML}
-
-          <h3 class="sub-titulo">🧪 Insumos Requeridos</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Descripción</th>
-                <th>Unidad</th>
-                <th>Necesario</th>
-                <th>Stock</th>
-                <th>Comprar</th>
-                <th>Subtotal</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filasInsumosHTML}
-            </tbody>
-          </table>
-
-          <div class="subtotal-pedido">
-            <strong>Subtotal PO ${pedido.po}:</strong>
-            <span>$${formatearNumero(pedido.total_comprar || 0)}</span>
-          </div>
-        </div>
-      `;
+    // Las últimas N filas + la fila de total van en un <tbody> que no se parte,
+    // así el total nunca queda solo en otra hoja.
+    function cuerpoConCierre(filas, filaTotal, n = 3) {
+      const corte = Math.max(0, filas.length - n);
+      const normal = filas.slice(0, corte).join("");
+      const cola = filas.slice(corte).join("");
+      return (normal ? `<tbody>${normal}</tbody>` : "") +
+             `<tbody class="cierre">${cola}${filaTotal}</tbody>`;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Sección 2: PT consolidado
-    // ═══════════════════════════════════════════════════════════════
-    let filasPT_Consolidadas = "";
-    let totCPed = 0, totCSur = 0, totCStock = 0, totCPend = 0;
-    for (const pt of ptConsolidado) {
-      totCPed += pt.pz_pedidas || 0;
-      totCSur += pt.pz_surtidas || 0;
-      totCStock += pt.pz_en_stock || 0;
-      totCPend += pt.pz_pendientes || 0;
-      filasPT_Consolidadas += `<tr>
+    function filaPT(pt) {
+      return `<tr>
         <td class="codigo">${pt.pt_codigo}</td>
         <td class="desc">${pt.descripcion || "—"}</td>
         <td class="num">${formatearNumero(pt.pz_pedidas, 0)}</td>
@@ -1832,17 +1736,12 @@ async function imprimirConsolidado() {
       </tr>`;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // Sección 3: Insumos consolidados
-    // ═══════════════════════════════════════════════════════════════
-    let filasConsolidadasHTML = "";
-    for (const e of insumosConsolidados) {
-      const estadoIcon = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
-      const colorEstado = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
+    function filaInsumo(e) {
+      const estadoTxt = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
+      const color = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
       const comprarTxt = e.comprar > 0 ? formatearNumero(e.comprar) + " " + (e.unidad || "") : "—";
       const subTxt = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
-
-      filasConsolidadasHTML += `<tr>
+      return `<tr>
         <td class="codigo">${e.insumo}</td>
         <td class="desc">${e.descripcion || "—"}</td>
         <td class="centro">${e.unidad || ""}</td>
@@ -1850,13 +1749,57 @@ async function imprimirConsolidado() {
         <td class="num">${formatearNumero(e.stock_actual)}</td>
         <td class="num comprar">${comprarTxt}</td>
         <td class="num subtotal">${subTxt}</td>
-        <td class="centro" style="color:${colorEstado};font-weight:700;">${estadoIcon}</td>
+        <td class="centro" style="color:${color};font-weight:700;">${estadoTxt}</td>
       </tr>`;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // HTML final
-    // ═══════════════════════════════════════════════════════════════
+    function tablaPT(lista) {
+      if (!lista || lista.length === 0) return "";
+      let tP = 0, tS = 0, tSt = 0, tPe = 0;
+      lista.forEach(pt => {
+        tP += pt.pz_pedidas || 0; tS += pt.pz_surtidas || 0;
+        tSt += pt.pz_en_stock || 0; tPe += pt.pz_pendientes || 0;
+      });
+      const total = `<tr class="fila-total">
+        <td colspan="2" style="text-align:right;">TOTAL:</td>
+        <td class="num">${formatearNumero(tP, 0)}</td>
+        <td class="num">${formatearNumero(tS, 0)}</td>
+        <td class="num stock">${formatearNumero(tSt, 0)}</td>
+        <td class="num pend">${formatearNumero(tPe, 0)}</td>
+      </tr>`;
+      return `<table>${COLS_PT}${HEAD_PT}${cuerpoConCierre(lista.map(filaPT), total)}</table>`;
+    }
+
+    function tablaInsumos(lista, etiquetaTotal, monto, grande = false) {
+      const cls = grande ? "fila-total fila-total-grande" : "fila-total";
+      const total = `<tr class="${cls}">
+        <td colspan="6" style="text-align:right;">${etiquetaTotal}</td>
+        <td colspan="2" class="num subtotal" style="text-align:right;">$${formatearNumero(monto || 0)}</td>
+      </tr>`;
+      return `<table>${COLS_INS}${HEAD_INS}${cuerpoConCierre((lista || []).map(filaInsumo), total)}</table>`;
+    }
+
+    // ─── Secciones por pedido ────────────────────────────────────────
+    let seccionesHTML = "";
+    for (const pedido of pedidos) {
+      const pt = pedido.pt || [];
+      seccionesHTML += `
+        <section class="seccion-pedido">
+          <h2>📋 PO ${pedido.po}</h2>
+          <p class="meta-pedido">
+            <strong>Fecha:</strong> ${formatearFecha(pedido.fecha)} &nbsp;·&nbsp;
+            <strong>Pedidas:</strong> ${formatearNumero(pedido.pz_pedidas, 0)} PZ &nbsp;·&nbsp;
+            <strong>Surtidas:</strong> ${formatearNumero(pedido.pz_surtidas, 0)} &nbsp;·&nbsp;
+            <strong>En Stock PT:</strong> <span style="color:#1F7A1F;font-weight:700;">${formatearNumero(pedido.pz_en_stock, 0)}</span> &nbsp;·&nbsp;
+            <strong>Pendientes:</strong> ${formatearNumero(pedido.pz_pendientes, 0)}
+          </p>
+          ${pt.length ? `<h3 class="sub-titulo">📦 Producto Terminado (PT)</h3>${tablaPT(pt)}` : ""}
+          <h3 class="sub-titulo">🧪 Insumos Requeridos</h3>
+          ${tablaInsumos(pedido.insumos, "Subtotal PO " + pedido.po + ":", pedido.total_comprar)}
+        </section>`;
+    }
+
+    // ─── HTML final ──────────────────────────────────────────────────
     const htmlImpresion = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1865,108 +1808,66 @@ async function imprimirConsolidado() {
 <style>
   @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #1A202C; padding: 15px; font-size: 11px; background: white; }
+  html, body { width: 100%; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         color: #1A202C; padding: 15px; font-size: 11px; background: white; }
 
   h1 { font-size: 22px; color: #1F4E79; margin-bottom: 4px; }
-  h2 { font-size: 14px; color: #1F4E79; margin: 15px 0 8px 0; padding-bottom: 6px; border-bottom: 2px solid #1F4E79; }
-  h3.sub-titulo { font-size: 12px; color: #1F4E79; margin: 12px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid #CBD5E0; }
+  h2 { font-size: 14px; color: #1F4E79; margin: 12px 0 8px; padding-bottom: 6px;
+       border-bottom: 2px solid #1F4E79; break-after: avoid; page-break-after: avoid; }
+  h3.sub-titulo { font-size: 12px; color: #1F4E79; margin: 10px 0 6px; padding-bottom: 4px;
+       border-bottom: 1px solid #CBD5E0; break-after: avoid; page-break-after: avoid; }
+  .meta-pedido { margin-bottom: 6px; break-after: avoid; page-break-after: avoid; }
 
-  .encabezado { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #1F4E79; padding-bottom: 12px; margin-bottom: 15px; }
+  .encabezado { display: flex; justify-content: space-between; align-items: flex-start;
+                border-bottom: 3px solid #1F4E79; padding-bottom: 12px; margin-bottom: 10px; }
   .encabezado-der { text-align: right; font-size: 11px; color: #4A5568; }
 
-  .resumen { display: flex; gap: 20px; background: #F9FAFB; border: 1px solid #E0E4EA; border-radius: 6px; padding: 10px 15px; margin-bottom: 15px; font-size: 11px; flex-wrap: wrap; }
+  .resumen { display: flex; gap: 20px; flex-wrap: wrap; background: #F9FAFB; border: 1px solid #E0E4EA;
+             border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; font-size: 11px;
+             break-inside: avoid; break-after: avoid; }
   .resumen strong { color: #1F4E79; }
-  .resumen .st-stock { color: #C00000; font-weight: 700; }
-  .resumen .st-parcial { color: #B45309; font-weight: 700; }
-  .resumen .st-ok { color: #1F7A1F; font-weight: 700; }
+  .st-stock { color: #C00000; font-weight: 700; }
+  .st-parcial { color: #B45309; font-weight: 700; }
+  .st-ok { color: #1F7A1F; font-weight: 700; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 9px; margin-bottom: 12px; table-layout: fixed; }
-  thead { background: #1F4E79; color: white; display: table-header-group; }
-  th { padding: 5px 3px; font-weight: 600; font-size: 8px; text-transform: uppercase; text-align: center; word-wrap: break-word; }
+  /* Tablas: ancho fijo, nunca más anchas que la hoja */
+  table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed;
+          font-size: 9px; margin-bottom: 12px; }
+  thead { display: table-header-group; background: #1F4E79; color: white; }
+  th { padding: 5px 3px; font-weight: 600; font-size: 8px; text-transform: uppercase; text-align: center; }
   th:first-child, th:nth-child(2) { text-align: left; }
-  td { padding: 4px 3px; border-bottom: 1px solid #EEF1F5; text-align: center; vertical-align: middle; word-wrap: break-word; }
-  td:first-child, td:nth-child(2) { text-align: left; }
-  td.desc { text-align: left; word-wrap: break-word; }
+  td { padding: 4px 3px; border-bottom: 1px solid #EEF1F5; text-align: center;
+       vertical-align: middle; overflow-wrap: anywhere; }
+  td:first-child, td:nth-child(2), td.desc { text-align: left; }
   tr:nth-child(even) { background: #FAFBFD; }
   td.codigo { font-family: "Courier New", monospace; font-weight: 700; color: #1F4E79; font-size: 8px; }
-  td.num { text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 9px; }
+  td.num { font-variant-numeric: tabular-nums; }
   td.stock { color: #1F7A1F; font-weight: 600; }
   td.pend { color: #B45309; font-weight: 700; }
-  td.comprar { color: #C00000; font-weight: 700; }
-  td.subtotal { color: #C00000; font-weight: 700; }
-  tr.fila-total { background: #F0F4FA; border-top: 2px solid #1F4E79; }
-  tr.fila-total td { font-weight: 700; font-size: 10px; }
+  td.comprar, td.subtotal { color: #C00000; font-weight: 700; }
 
-.seccion-pedido {
-  page-break-inside: avoid;
-  page-break-after: auto;
-  margin-bottom: 15px;
-  padding: 10px;
-  border: 1px solid #E0E4EA;
-  border-radius: 8px;
-  page-break-before: auto;
-}
+  tr { break-inside: avoid; page-break-inside: avoid; }
+  tbody.cierre { break-inside: avoid; page-break-inside: avoid; }   /* total + últimas filas juntas */
+  tr.fila-total { background: #F0F4FA; }
+  tr.fila-total td { font-weight: 700; font-size: 10px; border-top: 2px solid #1F4E79; }
+  tr.fila-total-grande td { font-size: 13px; padding: 8px 4px; }
 
-.subtotal-pedido {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 6px 10px;
-  background: #F0F4FA;
-  border-radius: 4px;
-  margin-top: 6px;
-  margin-bottom: 0;
-  font-size: 11px;
-  page-break-inside: avoid;
-  page-break-after: avoid;
-  clear: both;
-  width: 100%;
-  box-sizing: border-box;
-}
-  .subtotal-pedido strong { color: #1F4E79; }
-  .subtotal-pedido span { color: #C00000; font-weight: 700; font-size: 14px; }
+  /* Saltos de página: cada PO (a partir del 2º) y el consolidado empiezan en hoja nueva.
+     SIN "break-inside: avoid" en la sección: eso era lo que dejaba la 1ª hoja en blanco. */
+  .seccion-pedido + .seccion-pedido,
+  .salto { break-before: page; page-break-before: always; }
 
-.total-grande {
-  font-size: 14px;
-  color: #C00000;
-  font-weight: 700;
-  text-align: right;
-  margin-top: 15px;
-  margin-bottom: 15px;
-  padding: 10px 15px;
-  border-top: 2px solid #1F4E79;
-  background: #F0F4FA;
-  border-radius: 6px;
-  page-break-inside: avoid;
-  page-break-before: avoid;
-  width: 100%;
-  max-width: 100%;
-  box-sizing: border-box;
-  display: block;
-  clear: both;
-}
-.pie {
-  margin-top: 15px;
-  padding-top: 8px;
-  border-top: 1px solid #E0E4EA;
-  font-size: 9px;
-  color: #718096;
-  text-align: center;
-  page-break-inside: avoid;
-  page-break-before: avoid;
-  width: 100%;
-  box-sizing: border-box;
-}
+  .pie { margin-top: 12px; padding-top: 8px; border-top: 1px solid #E0E4EA; font-size: 9px;
+         color: #718096; text-align: center; break-before: avoid; page-break-before: avoid; }
 
-  .sin-imprimir { display: block; margin: 0 auto 15px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .sin-imprimir { display: block; margin: 0 auto 15px; padding: 10px 20px; background: #1F4E79;
+                  color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
 
-@media print {
-  .sin-imprimir { display: none; }
-  body { padding: 0; }
-  .seccion-pedido:not(:last-of-type) { page-break-after: always; }
-  .seccion-pedido:last-of-type { page-break-after: auto; }
-  h2 { page-break-after: avoid; }
-}
+  @media print {
+    .sin-imprimir { display: none; }
+    body { padding: 0; }
+  }
 </style>
 </head>
 <body>
@@ -1984,73 +1885,24 @@ async function imprimirConsolidado() {
     </div>
   </div>
 
-    <h2 style="margin-top:0;">📋 Desglose por Pedido</h2>
   ${seccionesHTML}
 
-  <h2 style="margin-top:30px;">🧪 Consolidado Final (Todos los Pedidos)</h2>
-  <div class="resumen">
-    <div><strong>Total de insumos:</strong> ${data.total_insumos}</div>
-    <div><span class="st-stock">❌ SIN STOCK:</span> ${data.insumos_sin_stock}</div>
-    <div><span class="st-parcial">⚠️ PARCIALES:</span> ${data.insumos_parciales}</div>
-    <div><span class="st-ok">✅ OK:</span> ${data.insumos_ok}</div>
-  </div>
+  <div class="salto">
+    <h2>🧪 Consolidado Final (Todos los Pedidos)</h2>
+    <div class="resumen">
+      <div><strong>Total de insumos:</strong> ${data.total_insumos}</div>
+      <div><span class="st-stock">❌ SIN STOCK:</span> ${data.insumos_sin_stock}</div>
+      <div><span class="st-parcial">⚠️ PARCIALES:</span> ${data.insumos_parciales}</div>
+      <div><span class="st-ok">✅ OK:</span> ${data.insumos_ok}</div>
+    </div>
 
-  <!-- ═══════════════════════════════════════════════════════════════
-       CONSOLIDADO FINAL
-       ═══════════════════════════════════════════════════════════════ -->
-  <h2 style="margin-top:40px;">📦 PT Consolidado (Todos los Pedidos)</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Código OAR</th>
-        <th>Descripción</th>
-        <th>Pedidas</th>
-        <th>Surtidas</th>
-        <th>Stock PT</th>
-        <th>Pendientes</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${filasPT_Consolidadas}
-      <tr class="fila-total">
-        <td colspan="2" style="text-align:right;">TOTAL:</td>
-        <td class="num">${formatearNumero(totCPed, 0)}</td>
-        <td class="num">${formatearNumero(totCSur, 0)}</td>
-        <td class="num stock">${formatearNumero(totCStock, 0)}</td>
-        <td class="num pend">${formatearNumero(totCPend, 0)}</td>
-      </tr>
-    </tbody>
-  </table>
+    <h3 class="sub-titulo">📦 PT Consolidado</h3>
+    ${tablaPT(ptConsolidado)}
 
-  <h2 style="margin-top:30px;">🧪 Insumos Consolidados (Todos los Pedidos)</h2>
-  <div class="resumen">
-    <div><strong>Total de insumos:</strong> ${data.total_insumos}</div>
-    <div><span class="st-stock">❌ SIN STOCK:</span> ${data.insumos_sin_stock}</div>
-    <div><span class="st-parcial">⚠️ PARCIALES:</span> ${data.insumos_parciales}</div>
-    <div><span class="st-ok">✅ OK:</span> ${data.insumos_ok}</div>
-  </div>
-  <table>
-    <thead>
-      <tr>
-        <th>Código</th>
-        <th>Descripción</th>
-        <th>Unidad</th>
-        <th>Necesario</th>
-        <th>Stock</th>
-        <th>Comprar</th>
-        <th>Subtotal</th>
-        <th>Estado</th>
-      </tr>
-    </thead>
-    <tbody>${filasConsolidadasHTML}</tbody>
-  </table>
+    <h3 class="sub-titulo">🧪 Insumos Consolidados</h3>
+    ${tablaInsumos(insumosConsolidados, "TOTAL A COMPRAR:", data.total_general, true)}
 
-  <div class="total-grande">
-  TOTAL A COMPRAR: <span style="font-size:16px;">$${formatearNumero(data.total_general)}</span>
-  </div>
-
-  <div class="pie">
-    Sistema Visor Tarimas - Mediese · ${data.fecha_generacion}
+    <div class="pie">Sistema Visor Tarimas - Mediese · ${data.fecha_generacion}</div>
   </div>
 </body>
 </html>`;
