@@ -1691,40 +1691,82 @@ async function imprimirConsolidado() {
     const data = await llamarBackend(CONFIG.APPS_SCRIPT_URL + "?accion=consolidado_general");
     if (!data.ok) throw new Error(data.error);
 
-    // Reconstruir la lista
     cont.innerHTML = original;
 
-    // Generar PDF
-    const insumos = data.insumos || [];
     const pedidos = data.pedidos || [];
+    const insumosConsolidados = data.insumos_consolidados || [];
 
-    let filasPedidosHTML = "";
-    for (const p of pedidos) {
-      filasPedidosHTML += `<tr style="border-bottom:1px solid #eee;">
-        <td style="padding:6px;font-family:monospace;font-weight:600;">${p.po}</td>
-        <td style="padding:6px;">${p.fecha}</td>
-        <td style="padding:6px;text-align:right;">${formatearNumero(p.pz_pedidas, 0)}</td>
-        <td style="padding:6px;text-align:right;">${formatearNumero(p.pz_surtidas, 0)}</td>
-        <td style="padding:6px;text-align:right;color:#B45309;font-weight:600;">${formatearNumero(p.pz_pendientes, 0)}</td>
-      </tr>`;
+    // ═══════════════════════════════════════════════════════════════
+    // Sección 1: Detalle por pedido
+    // ═══════════════════════════════════════════════════════════════
+    let seccionesHTML = "";
+
+    for (const pedido of pedidos) {
+      const fechaStr = formatearFecha(pedido.fecha);
+
+      let filasInsumosHTML = "";
+      for (const e of pedido.insumos) {
+        const estadoIcon = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
+        const colorEstado = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
+        const comprarTxt = e.comprar > 0 ? formatearNumero(e.comprar) + " " + (e.unidad || "") : "—";
+        const subTxt = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
+
+        filasInsumosHTML += `<tr>
+          <td class="codigo">${e.insumo}</td>
+          <td>${e.descripcion || "—"}</td>
+          <td class="centro">${e.unidad || ""}</td>
+          <td class="num">${formatearNumero(e.cantidad_necesaria)}</td>
+          <td class="num">${formatearNumero(e.stock_actual)}</td>
+          <td class="num comprar">${comprarTxt}</td>
+          <td class="num subtotal">${subTxt}</td>
+          <td class="centro" style="color:${colorEstado};font-weight:700;">${estadoIcon}</td>
+        </tr>`;
+      }
+
+      seccionesHTML += `
+        <div class="seccion-pedido">
+          <h2>📋 PO ${pedido.po}</h2>
+          <p style="font-size:11px;color:#4A5568;">
+            <strong>Fecha:</strong> ${fechaStr} ·
+            <strong>Pedidas:</strong> ${formatearNumero(pedido.pz_pedidas, 0)} PZ ·
+            <strong>Surtidas:</strong> ${formatearNumero(pedido.pz_surtidas, 0)} ·
+            <strong>Pendientes:</strong> ${formatearNumero(pedido.pz_pendientes, 0)}
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th><th>Descripción</th><th>Unidad</th>
+                <th>Necesario</th><th>Stock</th><th>Comprar</th>
+                <th>Subtotal</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>${filasInsumosHTML}</tbody>
+          </table>
+          <div class="subtotal-pedido">
+            <strong>Subtotal PO ${pedido.po}:</strong>
+            <span>$${formatearNumero(pedido.total_comprar)}</span>
+          </div>
+        </div>
+      `;
     }
 
-    let filasInsumosHTML = "";
-    for (const e of insumos) {
+    // ═══════════════════════════════════════════════════════════════
+    // Sección 2: Consolidado final
+    // ═══════════════════════════════════════════════════════════════
+    let filasConsolidadasHTML = "";
+    for (const e of insumosConsolidados) {
       const estadoIcon = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
       const colorEstado = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
       const comprarTxt = e.comprar > 0 ? formatearNumero(e.comprar) + " " + (e.unidad || "") : "—";
       const subTxt = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
 
-      filasInsumosHTML += `<tr>
+      filasConsolidadasHTML += `<tr>
         <td class="codigo">${e.insumo}</td>
         <td>${e.descripcion || "—"}</td>
         <td class="centro">${e.unidad || ""}</td>
         <td class="num">${formatearNumero(e.cantidad_necesaria)}</td>
         <td class="num">${formatearNumero(e.stock_actual)}</td>
         <td class="num comprar">${comprarTxt}</td>
-        <td class="num">${formatearNumero(e.pu)}</td>
-        <td class="num">${formatearNumero(e.iva_tasa)}</td>
         <td class="num subtotal">${subTxt}</td>
         <td class="centro" style="color:${colorEstado};font-weight:700;">${estadoIcon}</td>
       </tr>`;
@@ -1748,23 +1790,25 @@ async function imprimirConsolidado() {
   .resumen .st-stock { color: #C00000; font-weight: 700; }
   .resumen .st-parcial { color: #B45309; font-weight: 700; }
   .resumen .st-ok { color: #1F7A1F; font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 12px; }
   thead { background: #1F4E79; color: white; }
-  th { padding: 8px 5px; font-weight: 600; font-size: 9px; text-transform: uppercase; text-align: center; }
+  th { padding: 6px 4px; font-weight: 600; font-size: 9px; text-transform: uppercase; text-align: center; }
   th:first-child, th:nth-child(2) { text-align: left; }
-  td { padding: 6px 5px; border-bottom: 1px solid #EEF1F5; text-align: center; }
+  td { padding: 5px 4px; border-bottom: 1px solid #EEF1F5; text-align: center; }
   td:first-child, td:nth-child(2) { text-align: left; }
   tr:nth-child(even) { background: #FAFBFD; }
   td.codigo { font-family: "Courier New", monospace; font-weight: 700; color: #1F4E79; }
   td.num { text-align: center; }
   td.comprar { color: #C00000; font-weight: 700; }
   td.subtotal { color: #C00000; font-weight: 700; }
-  tr.fila-total { background: #F0F4FA; border-top: 2px solid #1F4E79; }
-  tr.fila-total td { font-weight: 700; font-size: 11px; padding: 10px 5px; }
-  .total-grande { font-size: 20px; color: #C00000; font-weight: 700; text-align: right; margin-top: 15px; padding-top: 15px; border-top: 3px solid #1F4E79; }
+  .seccion-pedido { page-break-inside: avoid; margin-bottom: 25px; padding: 12px; border: 1px solid #E0E4EA; border-radius: 8px; }
+  .subtotal-pedido { display: flex; justify-content: space-between; padding: 8px 12px; background: #F0F4FA; border-radius: 6px; margin-top: 8px; font-size: 12px; }
+  .subtotal-pedido strong { color: #1F4E79; }
+  .subtotal-pedido span { color: #C00000; font-weight: 700; font-size: 14px; }
+  .total-grande { font-size: 22px; color: #C00000; font-weight: 700; text-align: right; margin-top: 20px; padding: 20px; border-top: 3px solid #1F4E79; background: #F0F4FA; border-radius: 8px; }
   .pie { margin-top: 20px; padding-top: 10px; border-top: 1px solid #E0E4EA; font-size: 10px; color: #718096; text-align: center; }
   .sin-imprimir { display: block; margin: 0 auto 20px; padding: 10px 20px; background: #1F4E79; color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
-  @media print { .sin-imprimir { display: none; } body { padding: 0; } }
+  @media print { .sin-imprimir { display: none; } body { padding: 0; } .seccion-pedido { page-break-after: always; } }
 </style>
 </head>
 <body>
@@ -1782,21 +1826,10 @@ async function imprimirConsolidado() {
     </div>
   </div>
 
-  <h2>📋 Pedidos Activos</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>PO</th>
-        <th>Fecha Captura</th>
-        <th>Pedidas</th>
-        <th>Surtidas</th>
-        <th>Pendientes</th>
-      </tr>
-    </thead>
-    <tbody>${filasPedidosHTML}</tbody>
-  </table>
+  <h2 style="margin-top:0;">📋 Desglose por Pedido</h2>
+  ${seccionesHTML}
 
-  <h2>🧪 Insumos Consolidados (Compra Total)</h2>
+  <h2 style="page-break-before: always;">🧪 Consolidado Final (Todos los Pedidos)</h2>
   <div class="resumen">
     <div><strong>Total de insumos:</strong> ${data.total_insumos}</div>
     <div><span class="st-stock">❌ SIN STOCK:</span> ${data.insumos_sin_stock}</div>
@@ -1808,10 +1841,10 @@ async function imprimirConsolidado() {
       <tr>
         <th>Código</th><th>Descripción</th><th>Unidad</th>
         <th>Necesario</th><th>Stock</th><th>Comprar</th>
-        <th>PU</th><th>IVA</th><th>Subtotal</th><th>Estado</th>
+        <th>Subtotal</th><th>Estado</th>
       </tr>
     </thead>
-    <tbody>${filasInsumosHTML}</tbody>
+    <tbody>${filasConsolidadasHTML}</tbody>
   </table>
 
   <div class="total-grande">
