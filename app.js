@@ -1696,35 +1696,29 @@ async function imprimirConsolidado() {
     const insumosConsolidados = data.insumos_consolidados || [];
     const ptConsolidado = data.pt_consolidado || [];
 
-    // ─── Anchos fijos de columnas (suman 100%) ───────────────────────
+    // Columnas fijas
     const COLS_PT = `<colgroup>
       <col style="width:14%"><col style="width:34%"><col style="width:13%">
       <col style="width:13%"><col style="width:13%"><col style="width:13%">
     </colgroup>`;
+
     const COLS_INS = `<colgroup>
-      <col style="width:14%"><col style="width:26%"><col style="width:7%"><col style="width:11%">
-      <col style="width:10%"><col style="width:12%"><col style="width:12%"><col style="width:8%">
+      <col style="width:14%"><col style="width:26%"><col style="width:7%">
+      <col style="width:11%"><col style="width:10%"><col style="width:12%">
+      <col style="width:12%"><col style="width:8%">
     </colgroup>`;
 
     const HEAD_PT = `<thead><tr>
       <th>Código OAR</th><th>Descripción</th><th>Pedidas</th>
       <th>Surtidas</th><th>Stock PT</th><th>Pendientes</th>
     </tr></thead>`;
+
     const HEAD_INS = `<thead><tr>
       <th>Código</th><th>Descripción</th><th>Unidad</th><th>Necesario</th>
       <th>Stock</th><th>Comprar</th><th>Subtotal</th><th>Estado</th>
     </tr></thead>`;
 
-    // Las últimas N filas + la fila de total van en un <tbody> que no se parte,
-    // así el total nunca queda solo en otra hoja.
-    function cuerpoConCierre(filas, filaTotal, n = 3) {
-      const corte = Math.max(0, filas.length - n);
-      const normal = filas.slice(0, corte).join("");
-      const cola = filas.slice(corte).join("");
-      return (normal ? `<tbody>${normal}</tbody>` : "") +
-             `<tbody class="cierre">${cola}${filaTotal}</tbody>`;
-    }
-
+    // Filas por PT
     function filaPT(pt) {
       return `<tr>
         <td class="codigo">${pt.pt_codigo}</td>
@@ -1736,29 +1730,33 @@ async function imprimirConsolidado() {
       </tr>`;
     }
 
+    // Filas por insumo
     function filaInsumo(e) {
-      const estadoTxt = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
+      const txt = e.estado === "OK" ? "OK" : (e.estado === "PARCIAL" ? "PARCIAL" : "SIN STOCK");
       const color = e.estado === "OK" ? "#1F7A1F" : (e.estado === "PARCIAL" ? "#B45309" : "#C00000");
-      const comprarTxt = e.comprar > 0 ? formatearNumero(e.comprar) + " " + (e.unidad || "") : "—";
-      const subTxt = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
+      const comprar = e.comprar > 0 ? formatearNumero(e.comprar) + " " + (e.unidad || "") : "—";
+      const sub = e.subtotal > 0 ? "$" + formatearNumero(e.subtotal) : "—";
       return `<tr>
         <td class="codigo">${e.insumo}</td>
         <td class="desc">${e.descripcion || "—"}</td>
         <td class="centro">${e.unidad || ""}</td>
         <td class="num">${formatearNumero(e.cantidad_necesaria)}</td>
         <td class="num">${formatearNumero(e.stock_actual)}</td>
-        <td class="num comprar">${comprarTxt}</td>
-        <td class="num subtotal">${subTxt}</td>
-        <td class="centro" style="color:${color};font-weight:700;">${estadoTxt}</td>
+        <td class="num comprar">${comprar}</td>
+        <td class="num subtotal">${sub}</td>
+        <td class="centro" style="color:${color};font-weight:700;">${txt}</td>
       </tr>`;
     }
 
+    // Tabla PT completa
     function tablaPT(lista) {
       if (!lista || lista.length === 0) return "";
       let tP = 0, tS = 0, tSt = 0, tPe = 0;
       lista.forEach(pt => {
-        tP += pt.pz_pedidas || 0; tS += pt.pz_surtidas || 0;
-        tSt += pt.pz_en_stock || 0; tPe += pt.pz_pendientes || 0;
+        tP += pt.pz_pedidas || 0;
+        tS += pt.pz_surtidas || 0;
+        tSt += pt.pz_en_stock || 0;
+        tPe += pt.pz_pendientes || 0;
       });
       const total = `<tr class="fila-total">
         <td colspan="2" style="text-align:right;">TOTAL:</td>
@@ -1767,19 +1765,20 @@ async function imprimirConsolidado() {
         <td class="num stock">${formatearNumero(tSt, 0)}</td>
         <td class="num pend">${formatearNumero(tPe, 0)}</td>
       </tr>`;
-      return `<table>${COLS_PT}${HEAD_PT}${cuerpoConCierre(lista.map(filaPT), total)}</table>`;
+      return `<table>${COLS_PT}${HEAD_PT}<tbody>${lista.map(filaPT).join("")}</tbody><tbody>${total}</tbody></table>`;
     }
 
-    function tablaInsumos(lista, etiquetaTotal, monto, grande = false) {
+    // Tabla insumos completa
+    function tablaInsumos(lista, etiqueta, monto, grande) {
       const cls = grande ? "fila-total fila-total-grande" : "fila-total";
       const total = `<tr class="${cls}">
-        <td colspan="6" style="text-align:right;">${etiquetaTotal}</td>
+        <td colspan="6" style="text-align:right;">${etiqueta}</td>
         <td colspan="2" class="num subtotal" style="text-align:right;">$${formatearNumero(monto || 0)}</td>
       </tr>`;
-      return `<table>${COLS_INS}${HEAD_INS}${cuerpoConCierre((lista || []).map(filaInsumo), total)}</table>`;
+      return `<table>${COLS_INS}${HEAD_INS}<tbody>${(lista || []).map(filaInsumo).join("")}</tbody><tbody>${total}</tbody></table>`;
     }
 
-    // ─── Secciones por pedido ────────────────────────────────────────
+    // Secciones por pedido
     let seccionesHTML = "";
     for (const pedido of pedidos) {
       const pt = pedido.pt || [];
@@ -1795,11 +1794,10 @@ async function imprimirConsolidado() {
           </p>
           ${pt.length ? `<h3 class="sub-titulo">📦 Producto Terminado (PT)</h3>${tablaPT(pt)}` : ""}
           <h3 class="sub-titulo">🧪 Insumos Requeridos</h3>
-          ${tablaInsumos(pedido.insumos, "Subtotal PO " + pedido.po + ":", pedido.total_comprar)}
+          ${tablaInsumos(pedido.insumos, "Subtotal PO " + pedido.po + ":", pedido.total_comprar, false)}
         </section>`;
     }
 
-    // ─── HTML final ──────────────────────────────────────────────────
     const htmlImpresion = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1814,24 +1812,22 @@ async function imprimirConsolidado() {
 
   h1 { font-size: 22px; color: #1F4E79; margin-bottom: 4px; }
   h2 { font-size: 14px; color: #1F4E79; margin: 12px 0 8px; padding-bottom: 6px;
-       border-bottom: 2px solid #1F4E79; break-after: avoid; page-break-after: avoid; }
+       border-bottom: 2px solid #1F4E79; }
   h3.sub-titulo { font-size: 12px; color: #1F4E79; margin: 10px 0 6px; padding-bottom: 4px;
-       border-bottom: 1px solid #CBD5E0; break-after: avoid; page-break-after: avoid; }
-  .meta-pedido { margin-bottom: 6px; break-after: avoid; page-break-after: avoid; }
+       border-bottom: 1px solid #CBD5E0; }
+  .meta-pedido { margin-bottom: 6px; }
 
   .encabezado { display: flex; justify-content: space-between; align-items: flex-start;
                 border-bottom: 3px solid #1F4E79; padding-bottom: 12px; margin-bottom: 10px; }
   .encabezado-der { text-align: right; font-size: 11px; color: #4A5568; }
 
   .resumen { display: flex; gap: 20px; flex-wrap: wrap; background: #F9FAFB; border: 1px solid #E0E4EA;
-             border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; font-size: 11px;
-             break-inside: avoid; break-after: avoid; }
+             border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; font-size: 11px; }
   .resumen strong { color: #1F4E79; }
   .st-stock { color: #C00000; font-weight: 700; }
   .st-parcial { color: #B45309; font-weight: 700; }
   .st-ok { color: #1F7A1F; font-weight: 700; }
 
-  /* Tablas: ancho fijo, nunca más anchas que la hoja */
   table { width: 100%; max-width: 100%; border-collapse: collapse; table-layout: fixed;
           font-size: 9px; margin-bottom: 12px; }
   thead { display: table-header-group; background: #1F4E79; color: white; }
@@ -1847,19 +1843,16 @@ async function imprimirConsolidado() {
   td.pend { color: #B45309; font-weight: 700; }
   td.comprar, td.subtotal { color: #C00000; font-weight: 700; }
 
-  tr { break-inside: avoid; page-break-inside: avoid; }
-  tbody.cierre { break-inside: avoid; page-break-inside: avoid; }   /* total + últimas filas juntas */
   tr.fila-total { background: #F0F4FA; }
   tr.fila-total td { font-weight: 700; font-size: 10px; border-top: 2px solid #1F4E79; }
   tr.fila-total-grande td { font-size: 13px; padding: 8px 4px; }
 
-  /* Saltos de página: cada PO (a partir del 2º) y el consolidado empiezan en hoja nueva.
-     SIN "break-inside: avoid" en la sección: eso era lo que dejaba la 1ª hoja en blanco. */
-  .seccion-pedido + .seccion-pedido,
-  .salto { break-before: page; page-break-before: always; }
+  .seccion-pedido { margin-bottom: 15px; }
+  .seccion-pedido + .seccion-pedido { page-break-before: always; break-before: page; }
+  .salto { page-break-before: always; break-before: page; }
 
   .pie { margin-top: 12px; padding-top: 8px; border-top: 1px solid #E0E4EA; font-size: 9px;
-         color: #718096; text-align: center; break-before: avoid; page-break-before: avoid; }
+         color: #718096; text-align: center; }
 
   .sin-imprimir { display: block; margin: 0 auto 15px; padding: 10px 20px; background: #1F4E79;
                   color: white; border: none; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
@@ -1917,7 +1910,6 @@ async function imprimirConsolidado() {
     alert("Error: " + e.message);
   }
 }
-
 
 // ═══════════════════════════════════════════════════════════════════
 // CARGA MASIVA DE PEDIDO DESDE EXCEL
