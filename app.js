@@ -2186,7 +2186,6 @@ async function generarAsignacionQR() {
   const statusEl = document.getElementById("qr-status");
   const checks = document.querySelectorAll(".chk-cedis");
 
-  // Recolectar seleccionados
   const seleccionados = [];
   checks.forEach(chk => {
     if (chk.checked) {
@@ -2225,52 +2224,115 @@ async function generarAsignacionQR() {
 
     asignacionGenerada = resp;
     renderizarAsignacion(resp);
-    statusEl.textContent = "✅ Asignación calculada";
-    statusEl.className = "send-status ok";
+
+    // Status final con resumen
+    const nTarimas = resp.total_tarimas || 0;
+    const nNoCub = resp.total_no_cubiertos || 0;
+    if (nTarimas === 0) {
+      statusEl.textContent = "⚠️ No se generó ninguna tarima (sin stock PT)";
+      statusEl.className = "send-status error";
+    } else if (nNoCub > 0) {
+      statusEl.textContent = "⚠️ " + nTarimas + " tarima(s) generada(s). " + nNoCub + " CEDIS sin cubrir.";
+      statusEl.className = "send-status error";
+    } else {
+      statusEl.textContent = "✅ " + nTarimas + " tarima(s) generada(s) — todos los CEDIS cubiertos";
+      statusEl.className = "send-status ok";
+    }
+
     document.getElementById("btn-descargar-csv").style.display = "block";
   } catch (e) {
     statusEl.textContent = "❌ " + e.message;
     statusEl.className = "send-status error";
   }
 }
-
 function renderizarAsignacion(resp) {
   const cont = document.getElementById("qr-resumen");
   const tarimas = resp.tarimas || [];
+  const noCubiertos = resp.no_cubiertos || [];
 
-  if (tarimas.length === 0) {
-    cont.innerHTML = '<p style="color:#C00000;">No se generó ninguna tarima.</p>';
-    return;
+  let html = "";
+
+  // ═══════════════════════════════════════════════════════════════
+  // BLOQUE 1: Tarimas asignadas
+  // ═══════════════════════════════════════════════════════════════
+  if (tarimas.length > 0) {
+    html += '<h3 style="margin-bottom:10px;color:#1F7A1F;font-size:15px;">✅ Tarimas Asignadas (' + tarimas.length + ')</h3>';
+    html += '<div style="overflow-x:auto;">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:#1F7A1F;color:white;">';
+    html += '<th style="padding:6px;">#</th>';
+    html += '<th style="padding:6px;">CEDIS</th>';
+    html += '<th style="padding:6px;">PO</th>';
+    html += '<th style="padding:6px;">Sabor</th>';
+    html += '<th style="padding:6px;">Lotes asignados</th>';
+    html += '<th style="padding:6px;">Total PZ</th>';
+    html += '</tr></thead><tbody>';
+
+    tarimas.forEach((t, i) => {
+      const lotesTxt = (t.lotes || []).map(l =>
+        `${l.lote}<br><span style="color:#718096;font-size:10px;">${l.pz} PZ</span>`
+      ).join("<br>");
+      const totalPZ = (t.lotes || []).reduce((s, l) => s + (l.pz || 0), 0);
+      const parcial = totalPZ < 5200;
+
+      html += `<tr style="border-bottom:1px solid #eee;${i % 2 === 0 ? "background:#FAFBFD;" : ""}">
+        <td style="padding:6px;text-align:center;font-weight:700;">${t.num_tarima}</td>
+        <td style="padding:6px;text-align:center;font-weight:600;">${t.cedis}</td>
+        <td style="padding:6px;text-align:center;font-family:monospace;font-size:11px;">${t.po}</td>
+        <td style="padding:6px;text-align:center;">${t.sabor}</td>
+        <td style="padding:6px;font-size:11px;">${lotesTxt}</td>
+        <td style="padding:6px;text-align:right;font-weight:700;${parcial ? "color:#B45309;" : ""}">${formatearNumero(totalPZ, 0)}${parcial ? " ⚠️" : ""}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  } else {
+    html += '<p style="color:#B45309;font-weight:600;">⚠️ No se generó ninguna tarima (sin stock PT).</p>';
   }
 
-  let html = '<h3 style="margin-bottom:10px;color:#1F4E79;font-size:15px;">📋 Tarimas Asignadas</h3>';
-  html += '<div style="overflow-x:auto;">';
-  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
-  html += '<thead><tr style="background:#1F7A1F;color:white;">';
-  html += '<th style="padding:6px;">#</th>';
-  html += '<th style="padding:6px;">CEDIS</th>';
-  html += '<th style="padding:6px;">Sabor</th>';
-  html += '<th style="padding:6px;">Lotes asignados</th>';
-  html += '<th style="padding:6px;">Total PZ</th>';
-  html += '</tr></thead><tbody>';
+  // ═══════════════════════════════════════════════════════════════
+  // BLOQUE 2: CEDIS no cubiertos
+  // ═══════════════════════════════════════════════════════════════
+  if (noCubiertos.length > 0) {
+    html += '<h3 style="margin:20px 0 10px;color:#C00000;font-size:15px;">❌ CEDIS No Cubiertos (' + noCubiertos.length + ')</h3>';
+    html += '<div style="overflow-x:auto;">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:#C00000;color:white;">';
+    html += '<th style="padding:6px;">CEDIS</th>';
+    html += '<th style="padding:6px;">PO</th>';
+    html += '<th style="padding:6px;">PT</th>';
+    html += '<th style="padding:6px;">Pendientes</th>';
+    html += '<th style="padding:6px;">Cubiertos</th>';
+    html += '<th style="padding:6px;">Faltantes</th>';
+    html += '<th style="padding:6px;">Motivo</th>';
+    html += '</tr></thead><tbody>';
 
-  tarimas.forEach((t, i) => {
-    const lotesTxt = (t.lotes || []).map(l => `${l.lote}<br><span style="color:#718096;font-size:10px;">${l.pz} PZ</span>`).join("<br>");
-    const totalPZ = (t.lotes || []).reduce((s, l) => s + (l.pz || 0), 0);
-    html += `<tr style="border-bottom:1px solid #eee;${i % 2 === 0 ? "background:#FAFBFD;" : ""}">
-      <td style="padding:6px;text-align:center;font-weight:700;">${t.num_tarima}</td>
-      <td style="padding:6px;text-align:center;">${t.cedis}</td>
-      <td style="padding:6px;text-align:center;">${t.sabor}</td>
-      <td style="padding:6px;font-size:11px;">${lotesTxt}</td>
-      <td style="padding:6px;text-align:right;font-weight:700;">${formatearNumero(totalPZ, 0)}</td>
-    </tr>`;
-  });
-  html += '</tbody></table></div>';
+    noCubiertos.forEach((n, i) => {
+      const cubiertos = n.pz_cubiertos || 0;
+      const faltantes = n.pz_faltantes || n.pz_pendientes;
+      html += `<tr style="border-bottom:1px solid #eee;${i % 2 === 0 ? "background:#FFF5F5;" : ""}">
+        <td style="padding:6px;text-align:center;font-weight:600;">${n.cedis}</td>
+        <td style="padding:6px;text-align:center;font-family:monospace;font-size:11px;">${n.po}</td>
+        <td style="padding:6px;text-align:center;font-size:11px;">${n.pt_codigo}</td>
+        <td style="padding:6px;text-align:right;">${formatearNumero(n.pz_pendientes, 0)}</td>
+        <td style="padding:6px;text-align:right;color:#1F7A1F;">${cubiertos > 0 ? formatearNumero(cubiertos, 0) : "—"}</td>
+        <td style="padding:6px;text-align:right;color:#C00000;font-weight:700;">${formatearNumero(faltantes, 0)}</td>
+        <td style="padding:6px;font-size:11px;color:#718096;">${n.motivo || ""}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
 
+  // ═══════════════════════════════════════════════════════════════
+  // BLOQUE 3: Alertas (tarimas parciales, etc.)
+  // ═══════════════════════════════════════════════════════════════
   if (resp.alertas && resp.alertas.length > 0) {
-    html += '<div style="margin-top:12px;padding:10px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;">';
-    html += '<b>⚠️ Alertas:</b><ul style="margin:6px 0 0 20px;font-size:12px;">';
-    resp.alertas.forEach(a => { html += '<li>' + a + '</li>'; });
+    html += '<div style="margin-top:15px;padding:10px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;">';
+    html += '<b>⚠️ Alertas (' + resp.alertas.length + '):</b>';
+    html += '<ul style="margin:6px 0 0 20px;font-size:12px;max-height:200px;overflow-y:auto;">';
+    resp.alertas.slice(0, 30).forEach(a => { html += '<li>' + a + '</li>'; });
+    if (resp.alertas.length > 30) {
+      html += '<li style="color:#718096;font-style:italic;">... y ' + (resp.alertas.length - 30) + ' más</li>';
+    }
     html += '</ul></div>';
   }
 
@@ -2284,13 +2346,24 @@ function descargarAsignacionCSV() {
   }
 
   const tarimas = asignacionGenerada.tarimas;
-  let csv = "num_tarima,cedis,sabor,camion,po,lote,pz\n";
+  const noCub = asignacionGenerada.no_cubiertos || [];
+
+  let csv = "=== TARIMAS ASIGNADAS ===\n";
+  csv += "num_tarima,cedis,po,sabor,lote,pz,pt_codigo\n";
 
   tarimas.forEach(t => {
     (t.lotes || []).forEach(l => {
-      csv += `${t.num_tarima},${t.cedis},${t.sabor},${t.camion || ""},${t.po || ""},${l.lote},${l.pz}\n`;
+      csv += `${t.num_tarima},${t.cedis},${t.po},${t.sabor},${l.lote},${l.pz},${t.pt_codigo}\n`;
     });
   });
+
+  if (noCub.length > 0) {
+    csv += "\n=== CEDIS NO CUBIERTOS ===\n";
+    csv += "cedis,po,pt_codigo,sabor,pz_pendientes,pz_cubiertos,pz_faltantes,motivo\n";
+    noCub.forEach(n => {
+      csv += `${n.cedis},${n.po},${n.pt_codigo},${n.sabor || ""},${n.pz_pendientes},${n.pz_cubiertos || 0},${n.pz_faltantes || n.pz_pendientes},"${n.motivo || ""}"\n`;
+    });
+  }
 
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
