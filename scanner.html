@@ -41,12 +41,20 @@
       <p class="selector-descripcion">Selecciona el tipo de evento</p>
       <div id="lista-eventos" class="lista-eventos"></div>
       <hr style="margin: 25px 0; border: 0; border-top: 1px solid #ddd;">
-      <button id="btn-pedidos" class="btn-evento hidden" style="background:#2C5282;" onclick="mostrarListaPedidos()">
+      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+      <button id="btn-pedidos" class="btn-evento hidden" style="background:#2C5282;flex:1;min-width:140px;max-width:180px;" onclick="mostrarListaPedidos()">
         <span style="font-size:24px;">📦</span><br/>
         <span>Pedidos</span><br/>
         <span style="font-size:11px;opacity:0.85;">Calcular insumos</span>
       </button>
+    
+      <button id="btn-generar-qr" class="btn-evento hidden" style="background:#1F7A1F;flex:1;min-width:140px;max-width:180px;" onclick="mostrarGenerarQRs()">
+        <span style="font-size:24px;">🖨️</span><br/>
+        <span>Generar QRs</span><br/>
+        <span style="font-size:11px;opacity:0.85;">Tarimas PT</span>
+      </button>
     </div>
+  
   </section>
 
   <!-- Vista: LISTO PARA ESCANEAR -->
@@ -345,6 +353,39 @@ CHILI
     </button>
   </div>
 </section>
+
+<!-- PANTALLA: Generar QRs (asignación de lotes FIFO) -->
+<section id="pantalla-generar-qr" class="view-section hidden">
+  <div class="estatus-container" style="max-width:900px;">
+    <div class="estatus-header">
+      <h2>🖨️ Generar QRs de Tarimas</h2>
+      <button onclick="volverMenu()" class="btn-cerrar">←</button>
+    </div>
+
+    <p class="manual-descripcion">
+      Selecciona los CEDIS a cubrir. Se asignarán los lotes en orden FIFO
+      (más antiguos primero) y se acomodarán por número de CEDIS ascendente.
+    </p>
+
+    <div id="qr-lista-cedis" style="margin:15px 0;">
+      <p style="text-align:center;color:#718096;">Cargando CEDIS pendientes...</p>
+    </div>
+
+    <div id="qr-resumen" style="margin:15px 0;"></div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:15px;">
+      <button class="btn-primary btn-large" onclick="generarAsignacionQR()" id="btn-generar-asignacion" style="flex:1;min-width:200px;">
+        🎯 Generar Asignación
+      </button>
+      <button class="btn-secondary" onclick="descargarAsignacionCSV()" id="btn-descargar-csv" style="flex:1;min-width:200px;display:none;">
+        📥 Descargar CSV
+      </button>
+    </div>
+
+    <p id="qr-status" class="send-status"></p>
+  </div>
+</section>
+  
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
