@@ -175,6 +175,8 @@ const App = (() => {
     if (ROLES_PEDIDOS.includes(session.rol)) {
       const btnPedidos = document.getElementById("btn-pedidos");
       if (btnPedidos) btnPedidos.classList.remove("hidden");
+      const btnGenQR = document.getElementById("btn-generar-qr");
+      if (btnGenQR) btnGenQR.classList.remove("hidden");
     }
 
     document.getElementById("btn-logout").addEventListener("click", () => {
@@ -2052,6 +2054,258 @@ function procesarCargaMasiva() {
     `<br><b>Revisa y presiona "Guardar y calcular"</b>`;
   statusForm.className = "send-status ok";
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// GENERAR QRs - Asignación FIFO de lotes PT por CEDIS
+// ═══════════════════════════════════════════════════════════════════
+
+let cedisPendientesCache = null;
+let asignacionGenerada = null;
+
+function mostrarGenerarQRs() {
+  // Mostrar pantalla
+  ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
+   "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar",
+   "pantalla-pedidos", "pantalla-form-pedido", "pantalla-detalle-pedido",
+   "pantalla-generar-qr"]
+    .forEach(v => {
+      const el = document.getElementById(v);
+      if (el) el.classList.add("hidden");
+    });
+  document.getElementById("pantalla-generar-qr").classList.remove("hidden");
+
+  document.getElementById("qr-resumen").innerHTML = "";
+  document.getElementById("qr-status").textContent = "";
+  document.getElementById("qr-status").className = "send-status";
+  document.getElementById("btn-descargar-csv").style.display = "none";
+  asignacionGenerada = null;
+
+  cargarCedisPendientes();
+}
+
+async function cargarCedisPendientes() {
+  const cont = document.getElementById("qr-lista-cedis");
+  cont.innerHTML = '<p style="text-align:center;color:#718096;">⏳ Cargando...</p>';
+
+  try {
+    const url = CONFIG.APPS_SCRIPT_URL + "?accion=cedis_pendientes_para_qr";
+    const data = await llamarBackend(url);
+
+    if (!data.ok) throw new Error(data.error || "Error desconocido");
+
+    cedisPendientesCache = data.cedis_pendientes || [];
+    renderizarListaCedis(cedisPendientesCache);
+  } catch (e) {
+    cont.innerHTML = '<p style="text-align:center;color:#C00000;">❌ Error: ' + e.message + '</p>';
+  }
+}
+
+function renderizarListaCedis(lista) {
+  const cont = document.getElementById("qr-lista-cedis");
+  if (!lista || lista.length === 0) {
+    cont.innerHTML = '<p style="text-align:center;color:#1F7A1F;padding:20px;">✅ No hay CEDIS pendientes de cubrir.</p>';
+    return;
+  }
+
+  // Ordenar por CEDIS ascendente, luego por PO
+  lista.sort((a, b) => {
+    const ca = String(a.cedis).padStart(3, "0");
+    const cb = String(b.cedis).padStart(3, "0");
+    if (ca !== cb) return ca.localeCompare(cb);
+    return String(a.po).localeCompare(String(b.po));
+  });
+
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead><tr style="background:#1F4E79;color:white;">';
+  html += '<th style="padding:8px;width:40px;"></th>';
+  html += '<th style="padding:8px;text-align:left;">CEDIS</th>';
+  html += '<th style="padding:8px;text-align:left;">PO</th>';
+  html += '<th style="padding:8px;text-align:left;">PT</th>';
+  html += '<th style="padding:8px;text-align:center;">Pendientes</th>';
+  html += '<th style="padding:8px;text-align:center;">Tarimas</th>';
+  html += '</tr></thead><tbody>';
+
+  lista.forEach((item, idx) => {
+    const tarimas = Math.ceil((item.pz_pendientes || 0) / 5200);
+    html += `<tr style="border-bottom:1px solid #eee;">
+      <td style="padding:8px;text-align:center;">
+        <input type="checkbox" data-idx="${idx}" class="chk-cedis" checked
+          style="width:18px;height:18px;cursor:pointer;">
+      </td>
+      <td style="padding:8px;font-weight:700;">${item.cedis}</td>
+      <td style="padding:8px;font-family:monospace;font-size:12px;">${item.po}</td>
+      <td style="padding:8px;font-size:12px;">${item.pt_codigo}<br><span style="color:#718096;font-size:10px;">${item.descripcion || ""}</span></td>
+      <td style="padding:8px;text-align:center;font-weight:600;color:#B45309;">${formatearNumero(item.pz_pendientes, 0)}</td>
+      <td style="padding:8px;text-align:center;font-weight:600;">${tarimas}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  cont.innerHTML = html;
+
+  // Listeners
+  document.querySelectorAll(".chk-cedis").forEach(chk => {
+    chk.addEventListener("change", actualizarResumenSeleccion);
+  });
+  actualizarResumenSeleccion();
+}
+
+function actualizarResumenSeleccion() {
+  const checks = document.querySelectorAll(".chk-cedis");
+  let totalPZ = 0;
+  let totalTarimas = 0;
+  let seleccionados = 0;
+
+  checks.forEach(chk => {
+    if (chk.checked) {
+      const idx = Number(chk.getAttribute("data-idx"));
+      const item = cedisPendientesCache[idx];
+      if (item) {
+        totalPZ += item.pz_pendientes || 0;
+        totalTarimas += Math.ceil((item.pz_pendientes || 0) / 5200);
+        seleccionados++;
+      }
+    }
+  });
+
+  const resumen = document.getElementById("qr-resumen");
+  if (seleccionados === 0) {
+    resumen.innerHTML = '<p style="text-align:center;color:#718096;font-style:italic;">Selecciona al menos un CEDIS</p>';
+    return;
+  }
+  resumen.innerHTML = `
+    <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px;display:flex;justify-content:space-around;flex-wrap:wrap;gap:10px;">
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">CEDIS seleccionados</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${seleccionados}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Piezas totales</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${formatearNumero(totalPZ, 0)}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Tarimas a generar</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${totalTarimas}</div></div>
+    </div>
+  `;
+}
+
+async function generarAsignacionQR() {
+  const statusEl = document.getElementById("qr-status");
+  const checks = document.querySelectorAll(".chk-cedis");
+
+  // Recolectar seleccionados
+  const seleccionados = [];
+  checks.forEach(chk => {
+    if (chk.checked) {
+      const idx = Number(chk.getAttribute("data-idx"));
+      const item = cedisPendientesCache[idx];
+      if (item) seleccionados.push(item);
+    }
+  });
+
+  if (seleccionados.length === 0) {
+    statusEl.textContent = "❌ Selecciona al menos un CEDIS";
+    statusEl.className = "send-status error";
+    return;
+  }
+
+  statusEl.textContent = "⏳ Calculando asignación FIFO...";
+  statusEl.className = "send-status";
+
+  const session = getSessionGlobal();
+  const body = {
+    cedis_seleccionados: seleccionados.map(s => ({
+      po: s.po,
+      cedis: s.cedis,
+      pt_codigo: s.pt_codigo,
+      pz_pendientes: s.pz_pendientes,
+    })),
+    usuario: session ? session.user : "sistema",
+    rol: session ? session.rol : "admin",
+  };
+
+  const url = CONFIG.APPS_SCRIPT_URL + "?accion=generar_asignacion_qr&data=" + encodeURIComponent(JSON.stringify(body));
+
+  try {
+    const resp = await llamarBackend(url);
+    if (!resp.ok) throw new Error(resp.error || "Error desconocido");
+
+    asignacionGenerada = resp;
+    renderizarAsignacion(resp);
+    statusEl.textContent = "✅ Asignación calculada";
+    statusEl.className = "send-status ok";
+    document.getElementById("btn-descargar-csv").style.display = "block";
+  } catch (e) {
+    statusEl.textContent = "❌ " + e.message;
+    statusEl.className = "send-status error";
+  }
+}
+
+function renderizarAsignacion(resp) {
+  const cont = document.getElementById("qr-resumen");
+  const tarimas = resp.tarimas || [];
+
+  if (tarimas.length === 0) {
+    cont.innerHTML = '<p style="color:#C00000;">No se generó ninguna tarima.</p>';
+    return;
+  }
+
+  let html = '<h3 style="margin-bottom:10px;color:#1F4E79;font-size:15px;">📋 Tarimas Asignadas</h3>';
+  html += '<div style="overflow-x:auto;">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  html += '<thead><tr style="background:#1F7A1F;color:white;">';
+  html += '<th style="padding:6px;">#</th>';
+  html += '<th style="padding:6px;">CEDIS</th>';
+  html += '<th style="padding:6px;">Sabor</th>';
+  html += '<th style="padding:6px;">Lotes asignados</th>';
+  html += '<th style="padding:6px;">Total PZ</th>';
+  html += '</tr></thead><tbody>';
+
+  tarimas.forEach((t, i) => {
+    const lotesTxt = (t.lotes || []).map(l => `${l.lote}<br><span style="color:#718096;font-size:10px;">${l.pz} PZ</span>`).join("<br>");
+    const totalPZ = (t.lotes || []).reduce((s, l) => s + (l.pz || 0), 0);
+    html += `<tr style="border-bottom:1px solid #eee;${i % 2 === 0 ? "background:#FAFBFD;" : ""}">
+      <td style="padding:6px;text-align:center;font-weight:700;">${t.num_tarima}</td>
+      <td style="padding:6px;text-align:center;">${t.cedis}</td>
+      <td style="padding:6px;text-align:center;">${t.sabor}</td>
+      <td style="padding:6px;font-size:11px;">${lotesTxt}</td>
+      <td style="padding:6px;text-align:right;font-weight:700;">${formatearNumero(totalPZ, 0)}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+
+  if (resp.alertas && resp.alertas.length > 0) {
+    html += '<div style="margin-top:12px;padding:10px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;">';
+    html += '<b>⚠️ Alertas:</b><ul style="margin:6px 0 0 20px;font-size:12px;">';
+    resp.alertas.forEach(a => { html += '<li>' + a + '</li>'; });
+    html += '</ul></div>';
+  }
+
+  cont.innerHTML = html;
+}
+
+function descargarAsignacionCSV() {
+  if (!asignacionGenerada || !asignacionGenerada.tarimas) {
+    alert("Primero genera la asignación");
+    return;
+  }
+
+  const tarimas = asignacionGenerada.tarimas;
+  let csv = "num_tarima,cedis,sabor,camion,po,lote,pz\n";
+
+  tarimas.forEach(t => {
+    (t.lotes || []).forEach(l => {
+      csv += `${t.num_tarima},${t.cedis},${t.sabor},${t.camion || ""},${t.po || ""},${l.lote},${l.pz}\n`;
+    });
+  });
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "asignacion_qr_" + new Date().toISOString().slice(0, 10) + ".csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Exponer al scope global
+window.mostrarGenerarQRs = mostrarGenerarQRs;
+window.cargarCedisPendientes = cargarCedisPendientes;
+window.generarAsignacionQR = generarAsignacionQR;
+window.descargarAsignacionCSV = descargarAsignacionCSV;
 
 // ═══════════════════════════════════════════════════════════════════
 // ALIAS DE COMPATIBILIDAD
