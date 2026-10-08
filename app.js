@@ -2221,6 +2221,7 @@ async function generarAsignacionQR() {
       cedis: s.cedis,
       pt_codigo: s.pt_codigo,
       pz_pendientes: s.pz_pendientes,
+      fecha_captura: s.fecha_captura || "",  // 🔥 NUEVO
     })),
     usuario: session ? session.user : "sistema",
     rol: session ? session.rol : "admin",
