@@ -2107,19 +2107,30 @@ function renderizarListaCedis(lista) {
     return;
   }
 
-  // Ordenar por CEDIS ascendente, luego por PO
+  // Ordenar por PO ascendente, luego CEDIS ascendente
   lista.sort((a, b) => {
-    const ca = String(a.cedis).padStart(3, "0");
-    const cb = String(b.cedis).padStart(3, "0");
-    if (ca !== cb) return ca.localeCompare(cb);
-    return String(a.po).localeCompare(String(b.po));
+    if (String(a.po) !== String(b.po)) return String(a.po).localeCompare(String(b.po));
+    return String(a.cedis).padStart(3, "0").localeCompare(String(b.cedis).padStart(3, "0"));
   });
 
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  // Resumen arriba
+  const totalPZ = lista.reduce((s, x) => s + (x.pz_pendientes || 0), 0);
+  const totalTarimas = lista.reduce((s, x) => s + Math.ceil((x.pz_pendientes || 0) / 5200), 0);
+  const posUnicos = new Set(lista.map(x => x.po));
+
+  let html = '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px;margin-bottom:15px;font-size:12px;color:#1E40AF;">';
+  html += '<b>ℹ️ Mostrando ' + lista.length + ' línea(s) con pendiente por generar</b><br>';
+  html += '<span style="font-size:11px;opacity:0.85;">';
+  html += posUnicos.size + ' PO(s) · ' + totalTarimas + ' tarima(s) estimadas · ' + formatearNumero(totalPZ, 0) + ' PZ';
+  html += '</span><br>';
+  html += '<span style="font-size:11px;opacity:0.85;font-style:italic;">Los CEDIS ya cubiertos por stock PT no aparecen aquí.</span>';
+  html += '</div>';
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
   html += '<thead><tr style="background:#1F4E79;color:white;">';
   html += '<th style="padding:8px;width:40px;"></th>';
-  html += '<th style="padding:8px;text-align:left;">CEDIS</th>';
   html += '<th style="padding:8px;text-align:left;">PO</th>';
+  html += '<th style="padding:8px;text-align:left;">CEDIS</th>';
   html += '<th style="padding:8px;text-align:left;">PT</th>';
   html += '<th style="padding:8px;text-align:center;">Pendientes</th>';
   html += '<th style="padding:8px;text-align:center;">Tarimas</th>';
@@ -2132,8 +2143,8 @@ function renderizarListaCedis(lista) {
         <input type="checkbox" data-idx="${idx}" class="chk-cedis" checked
           style="width:18px;height:18px;cursor:pointer;">
       </td>
-      <td style="padding:8px;font-weight:700;">${item.cedis}</td>
       <td style="padding:8px;font-family:monospace;font-size:12px;">${item.po}</td>
+      <td style="padding:8px;font-weight:700;">${item.cedis}</td>
       <td style="padding:8px;font-size:12px;">${item.pt_codigo}<br><span style="color:#718096;font-size:10px;">${item.descripcion || ""}</span></td>
       <td style="padding:8px;text-align:center;font-weight:600;color:#B45309;">${formatearNumero(item.pz_pendientes, 0)}</td>
       <td style="padding:8px;text-align:center;font-weight:600;">${tarimas}</td>
@@ -2143,7 +2154,6 @@ function renderizarListaCedis(lista) {
   html += '</tbody></table>';
   cont.innerHTML = html;
 
-  // Listeners
   document.querySelectorAll(".chk-cedis").forEach(chk => {
     chk.addEventListener("change", actualizarResumenSeleccion);
   });
