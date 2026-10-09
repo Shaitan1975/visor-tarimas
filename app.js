@@ -2138,17 +2138,20 @@ function renderizarListaCedis(lista) {
   html += '<span style="font-size:11px;opacity:0.85;font-style:italic;">Los CEDIS ya cubiertos por stock PT no aparecen aquí.</span>';
   html += '</div>';
 
-  // 🔥 Botones de selección masiva
-  html += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
+  // Botones de selección masiva
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">';
   html += '<button onclick="seleccionarTodosQR(true)" style="padding:8px 14px;background:#1F4E79;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✓ Seleccionar todo</button>';
   html += '<button onclick="seleccionarTodosQR(false)" style="padding:8px 14px;background:#F3F4F6;color:#374151;border:1px solid #D1D5DB;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✗ Deseleccionar todo</button>';
+  html += '<button onclick="aplicarCamionATodos()" style="padding:8px 14px;background:#1F7A1F;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚚 Aplicar camión a seleccionados</button>';
   html += '</div>';
 
-  // Lista de camiones para el dropdown
-  const opcionesCamion = camionesCacheQR.map(c => {
+  // Datalist con sugerencias de camiones (no obliga a usar solo esos)
+  html += '<datalist id="lista-camiones-datalist">';
+  camionesCacheQR.forEach(c => {
     const nombre = typeof c === "string" ? c : c.camion;
-    return `<option value="${nombre}">${nombre}</option>`;
-  }).join("");
+    html += `<option value="${nombre}"></option>`;
+  });
+  html += '</datalist>';
 
   html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
   html += '<thead><tr style="background:#1F4E79;color:white;">';
@@ -2174,11 +2177,9 @@ function renderizarListaCedis(lista) {
       <td style="padding:8px;text-align:center;font-weight:600;color:#B45309;">${formatearNumero(item.pz_pendientes, 0)}</td>
       <td style="padding:8px;text-align:center;font-weight:600;">${tarimas}</td>
       <td style="padding:8px;text-align:center;">
-        <select class="sel-camion" data-idx="${idx}" data-po="${item.po}"
-          style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:12px;background:white;">
-          <option value="">—</option>
-          ${opcionesCamion}
-        </select>
+        <input type="text" class="sel-camion" data-idx="${idx}" data-po="${item.po}"
+          list="lista-camiones-datalist" placeholder="C25-2026" autocomplete="off"
+          style="width:110px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:12px;background:white;text-align:center;">
       </td>
     </tr>`;
   });
@@ -2189,48 +2190,11 @@ function renderizarListaCedis(lista) {
   document.querySelectorAll(".chk-cedis").forEach(chk => {
     chk.addEventListener("change", actualizarResumenSeleccion);
   });
-  document.querySelectorAll(".sel-camion").forEach(sel => {
-    sel.addEventListener("change", validarCamiones);
+  document.querySelectorAll(".sel-camion").forEach(inp => {
+    inp.addEventListener("change", validarCamiones);
   });
   actualizarResumenSeleccion();
 }
-
-// 🔥 NUEVO: seleccionar/deseleccionar todo
-function seleccionarTodosQR(valor) {
-  document.querySelectorAll(".chk-cedis").forEach(chk => {
-    chk.checked = valor;
-  });
-  actualizarResumenSeleccion();
-}
-
-// 🔥 NUEVO: validar que un camión no mezcle POs
-function validarCamiones() {
-  const camionesUsados = {};
-  let conflicto = null;
-
-  document.querySelectorAll(".sel-camion").forEach(sel => {
-    const camion = sel.value;
-    const po = sel.getAttribute("data-po");
-    if (!camion) return;
-    if (camionesUsados[camion] && camionesUsados[camion] !== po) {
-      conflicto = { camion, po1: camionesUsados[camion], po2: po };
-    } else {
-      camionesUsados[camion] = po;
-    }
-  });
-
-  if (conflicto) {
-    alert("⚠️ El camión " + conflicto.camion + " ya está asignado al PO " +
-          conflicto.po1 + ". No puedes mezclar dos POs en el mismo camión.");
-    document.querySelectorAll(".sel-camion").forEach(sel => {
-      if (sel.value === conflicto.camion && sel.getAttribute("data-po") === conflicto.po2) {
-        sel.value = "";
-      }
-    });
-  }
-}
-
-window.seleccionarTodosQR = seleccionarTodosQR;
 
 function actualizarResumenSeleccion() {
   const checks = document.querySelectorAll(".chk-cedis");
@@ -2349,6 +2313,42 @@ async function generarAsignacionQR() {
     statusEl.className = "send-status error";
   }
 }
+function aplicarCamionATodos() {
+  const camion = prompt("¿Qué camión aplicar a todas las filas seleccionadas?\n\nEj: C25-2026");
+  if (!camion) return;
+  const c = camion.trim();
+  if (!c) return;
+
+  // Validar que no mezcle POs
+  const posEnSeleccion = new Set();
+  document.querySelectorAll(".chk-cedis").forEach(chk => {
+    if (!chk.checked) return;
+    const idx = chk.getAttribute("data-idx");
+    const input = document.querySelector(`.sel-camion[data-idx="${idx}"]`);
+    if (!input) return;
+    const po = input.getAttribute("data-po");
+    if (po) posEnSeleccion.add(po);
+  });
+
+  if (posEnSeleccion.size > 1) {
+    alert("⚠️ Las filas seleccionadas tienen más de un PO (" + [...posEnSeleccion].join(", ") +
+          ").\nNo puedes aplicar el mismo camión a distintos POs.");
+    return;
+  }
+
+  // Aplicar
+  document.querySelectorAll(".chk-cedis").forEach(chk => {
+    if (!chk.checked) return;
+    const idx = chk.getAttribute("data-idx");
+    const input = document.querySelector(`.sel-camion[data-idx="${idx}"]`);
+    if (input) input.value = c;
+  });
+
+  actualizarResumenSeleccion();
+  validarCamiones();
+}
+
+window.aplicarCamionATodos = aplicarCamionATodos;
 
 function renderizarAsignacion(resp) {
   const cont = document.getElementById("qr-resumen");
