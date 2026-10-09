@@ -2145,14 +2145,6 @@ function renderizarListaCedis(lista) {
   html += '<button onclick="aplicarCamionATodos()" style="padding:8px 14px;background:#1F7A1F;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚚 Aplicar camión a seleccionados</button>';
   html += '</div>';
 
-  // Datalist con sugerencias de camiones (no obliga a usar solo esos)
-  html += '<datalist id="lista-camiones-datalist">';
-  camionesCacheQR.forEach(c => {
-    const nombre = typeof c === "string" ? c : c.camion;
-    html += `<option value="${nombre}"></option>`;
-  });
-  html += '</datalist>';
-
   html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
   html += '<thead><tr style="background:#1F4E79;color:white;">';
   html += '<th style="padding:8px;width:40px;"></th>';
@@ -2178,7 +2170,7 @@ function renderizarListaCedis(lista) {
       <td style="padding:8px;text-align:center;font-weight:600;">${tarimas}</td>
       <td style="padding:8px;text-align:center;">
         <input type="text" class="sel-camion" data-idx="${idx}" data-po="${item.po}"
-          list="lista-camiones-datalist" placeholder="C25-2026" autocomplete="off"
+          placeholder="C25-2026" autocomplete="off"
           style="width:110px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:12px;background:white;text-align:center;">
       </td>
     </tr>`;
