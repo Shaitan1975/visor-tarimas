@@ -2061,9 +2061,21 @@ function procesarCargaMasiva() {
 
 let cedisPendientesCache = null;
 let asignacionGenerada = null;
+let camionesCacheQR = [];
+
+async function cargarCamionesQR() {
+  try {
+    const data = await llamarBackend(CONFIG.APPS_SCRIPT_URL + "?accion=listar_camiones");
+    camionesCacheQR = data.ok ? (data.camiones || []) : [];
+  } catch (e) {
+    camionesCacheQR = [];
+  }
+  if (camionesCacheQR.length === 0) {
+    camionesCacheQR = ["C21","C22","C23","C24","C25","C26","C27","C28","C29","C30"].map(c => ({ camion: c }));
+  }
+}
 
 function mostrarGenerarQRs() {
-  // Mostrar pantalla
   ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
    "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar",
    "pantalla-pedidos", "pantalla-form-pedido", "pantalla-detalle-pedido",
@@ -2080,7 +2092,8 @@ function mostrarGenerarQRs() {
   document.getElementById("btn-descargar-csv").style.display = "none";
   asignacionGenerada = null;
 
-  cargarCedisPendientes();
+  // 🔥 Cargar camiones primero, luego los CEDIS
+  cargarCamionesQR().then(() => cargarCedisPendientes());
 }
 
 async function cargarCedisPendientes() {
@@ -2113,7 +2126,6 @@ function renderizarListaCedis(lista) {
     return String(a.cedis).padStart(3, "0").localeCompare(String(b.cedis).padStart(3, "0"));
   });
 
-  // Resumen arriba
   const totalPZ = lista.reduce((s, x) => s + (x.pz_pendientes || 0), 0);
   const totalTarimas = lista.reduce((s, x) => s + Math.ceil((x.pz_pendientes || 0) / 5200), 0);
   const posUnicos = new Set(lista.map(x => x.po));
@@ -2126,6 +2138,18 @@ function renderizarListaCedis(lista) {
   html += '<span style="font-size:11px;opacity:0.85;font-style:italic;">Los CEDIS ya cubiertos por stock PT no aparecen aquí.</span>';
   html += '</div>';
 
+  // 🔥 Botones de selección masiva
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;">';
+  html += '<button onclick="seleccionarTodosQR(true)" style="padding:8px 14px;background:#1F4E79;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✓ Seleccionar todo</button>';
+  html += '<button onclick="seleccionarTodosQR(false)" style="padding:8px 14px;background:#F3F4F6;color:#374151;border:1px solid #D1D5DB;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✗ Deseleccionar todo</button>';
+  html += '</div>';
+
+  // Lista de camiones para el dropdown
+  const opcionesCamion = camionesCacheQR.map(c => {
+    const nombre = typeof c === "string" ? c : c.camion;
+    return `<option value="${nombre}">${nombre}</option>`;
+  }).join("");
+
   html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
   html += '<thead><tr style="background:#1F4E79;color:white;">';
   html += '<th style="padding:8px;width:40px;"></th>';
@@ -2134,13 +2158,14 @@ function renderizarListaCedis(lista) {
   html += '<th style="padding:8px;text-align:left;">PT</th>';
   html += '<th style="padding:8px;text-align:center;">Pendientes</th>';
   html += '<th style="padding:8px;text-align:center;">Tarimas</th>';
+  html += '<th style="padding:8px;text-align:center;">Camión</th>';
   html += '</tr></thead><tbody>';
 
   lista.forEach((item, idx) => {
     const tarimas = Math.ceil((item.pz_pendientes || 0) / 5200);
     html += `<tr style="border-bottom:1px solid #eee;">
       <td style="padding:8px;text-align:center;">
-        <input type="checkbox" data-idx="${idx}" class="chk-cedis" checked
+        <input type="checkbox" data-idx="${idx}" class="chk-cedis"
           style="width:18px;height:18px;cursor:pointer;">
       </td>
       <td style="padding:8px;font-family:monospace;font-size:12px;">${item.po}</td>
@@ -2148,6 +2173,13 @@ function renderizarListaCedis(lista) {
       <td style="padding:8px;font-size:12px;">${item.pt_codigo}<br><span style="color:#718096;font-size:10px;">${item.descripcion || ""}</span></td>
       <td style="padding:8px;text-align:center;font-weight:600;color:#B45309;">${formatearNumero(item.pz_pendientes, 0)}</td>
       <td style="padding:8px;text-align:center;font-weight:600;">${tarimas}</td>
+      <td style="padding:8px;text-align:center;">
+        <select class="sel-camion" data-idx="${idx}" data-po="${item.po}"
+          style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:12px;background:white;">
+          <option value="">—</option>
+          ${opcionesCamion}
+        </select>
+      </td>
     </tr>`;
   });
 
@@ -2157,14 +2189,55 @@ function renderizarListaCedis(lista) {
   document.querySelectorAll(".chk-cedis").forEach(chk => {
     chk.addEventListener("change", actualizarResumenSeleccion);
   });
+  document.querySelectorAll(".sel-camion").forEach(sel => {
+    sel.addEventListener("change", validarCamiones);
+  });
   actualizarResumenSeleccion();
 }
+
+// 🔥 NUEVO: seleccionar/deseleccionar todo
+function seleccionarTodosQR(valor) {
+  document.querySelectorAll(".chk-cedis").forEach(chk => {
+    chk.checked = valor;
+  });
+  actualizarResumenSeleccion();
+}
+
+// 🔥 NUEVO: validar que un camión no mezcle POs
+function validarCamiones() {
+  const camionesUsados = {};
+  let conflicto = null;
+
+  document.querySelectorAll(".sel-camion").forEach(sel => {
+    const camion = sel.value;
+    const po = sel.getAttribute("data-po");
+    if (!camion) return;
+    if (camionesUsados[camion] && camionesUsados[camion] !== po) {
+      conflicto = { camion, po1: camionesUsados[camion], po2: po };
+    } else {
+      camionesUsados[camion] = po;
+    }
+  });
+
+  if (conflicto) {
+    alert("⚠️ El camión " + conflicto.camion + " ya está asignado al PO " +
+          conflicto.po1 + ". No puedes mezclar dos POs en el mismo camión.");
+    document.querySelectorAll(".sel-camion").forEach(sel => {
+      if (sel.value === conflicto.camion && sel.getAttribute("data-po") === conflicto.po2) {
+        sel.value = "";
+      }
+    });
+  }
+}
+
+window.seleccionarTodosQR = seleccionarTodosQR;
 
 function actualizarResumenSeleccion() {
   const checks = document.querySelectorAll(".chk-cedis");
   let totalPZ = 0;
   let totalTarimas = 0;
   let seleccionados = 0;
+  const camionesSet = new Set();
 
   checks.forEach(chk => {
     if (chk.checked) {
@@ -2174,6 +2247,9 @@ function actualizarResumenSeleccion() {
         totalPZ += item.pz_pendientes || 0;
         totalTarimas += Math.ceil((item.pz_pendientes || 0) / 5200);
         seleccionados++;
+
+        const sel = document.querySelector(`.sel-camion[data-idx="${idx}"]`);
+        if (sel && sel.value) camionesSet.add(sel.value);
       }
     }
   });
@@ -2183,11 +2259,17 @@ function actualizarResumenSeleccion() {
     resumen.innerHTML = '<p style="text-align:center;color:#718096;font-style:italic;">Selecciona al menos un CEDIS</p>';
     return;
   }
+
+  const camionesTxt = camionesSet.size > 0
+    ? Array.from(camionesSet).join(", ")
+    : "⚠️ sin camión asignado";
+
   resumen.innerHTML = `
     <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px;display:flex;justify-content:space-around;flex-wrap:wrap;gap:10px;">
-      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">CEDIS seleccionados</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${seleccionados}</div></div>
-      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Piezas totales</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${formatearNumero(totalPZ, 0)}</div></div>
-      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Tarimas a generar</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${totalTarimas}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">CEDIS</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${seleccionados}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">PZ totales</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${formatearNumero(totalPZ, 0)}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Tarimas</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${totalTarimas}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Camiones</div><div style="font-size:14px;font-weight:700;color:#1F7A1F;">${camionesTxt}</div></div>
     </div>
   `;
 }
@@ -2197,11 +2279,27 @@ async function generarAsignacionQR() {
   const checks = document.querySelectorAll(".chk-cedis");
 
   const seleccionados = [];
+  let sinCamion = 0;
+
   checks.forEach(chk => {
     if (chk.checked) {
       const idx = Number(chk.getAttribute("data-idx"));
       const item = cedisPendientesCache[idx];
-      if (item) seleccionados.push(item);
+      if (!item) return;
+
+      const sel = document.querySelector(`.sel-camion[data-idx="${idx}"]`);
+      const camion = sel ? sel.value.trim() : "";
+
+      if (!camion) sinCamion++;
+
+      seleccionados.push({
+        po: item.po,
+        cedis: item.cedis,
+        pt_codigo: item.pt_codigo,
+        pz_pendientes: item.pz_pendientes,
+        fecha_captura: item.fecha_captura || "",
+        camion: camion,
+      });
     }
   });
 
@@ -2211,18 +2309,18 @@ async function generarAsignacionQR() {
     return;
   }
 
+  if (sinCamion > 0) {
+    statusEl.textContent = "❌ " + sinCamion + " línea(s) sin camión asignado";
+    statusEl.className = "send-status error";
+    return;
+  }
+
   statusEl.textContent = "⏳ Calculando asignación FIFO...";
   statusEl.className = "send-status";
 
   const session = getSessionGlobal();
   const body = {
-    cedis_seleccionados: seleccionados.map(s => ({
-      po: s.po,
-      cedis: s.cedis,
-      pt_codigo: s.pt_codigo,
-      pz_pendientes: s.pz_pendientes,
-      fecha_captura: s.fecha_captura || "",  // 🔥 NUEVO
-    })),
+    cedis_seleccionados: seleccionados,
     usuario: session ? session.user : "sistema",
     rol: session ? session.rol : "admin",
   };
@@ -2236,17 +2334,12 @@ async function generarAsignacionQR() {
     asignacionGenerada = resp;
     renderizarAsignacion(resp);
 
-    // Status final con resumen
     const nTarimas = resp.total_tarimas || 0;
-    const nNoCub = resp.total_no_cubiertos || 0;
     if (nTarimas === 0) {
       statusEl.textContent = "⚠️ No se generó ninguna tarima (sin stock PT)";
       statusEl.className = "send-status error";
-    } else if (nNoCub > 0) {
-      statusEl.textContent = "⚠️ " + nTarimas + " tarima(s) generada(s). " + nNoCub + " CEDIS sin cubrir.";
-      statusEl.className = "send-status error";
     } else {
-      statusEl.textContent = "✅ " + nTarimas + " tarima(s) generada(s) — todos los CEDIS cubiertos";
+      statusEl.textContent = "✅ " + nTarimas + " tarima(s) generada(s)";
       statusEl.className = "send-status ok";
     }
 
@@ -2256,6 +2349,7 @@ async function generarAsignacionQR() {
     statusEl.className = "send-status error";
   }
 }
+
 function renderizarAsignacion(resp) {
   const cont = document.getElementById("qr-resumen");
   const tarimas = resp.tarimas || [];
