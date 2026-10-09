@@ -2062,6 +2062,16 @@ function procesarCargaMasiva() {
 let cedisPendientesCache = null;
 let asignacionGenerada = null;
 let camionesCacheQR = [];
+let stockPTCache = {};   // 🔥 Stock PT por sabor
+
+function ptASaborFront(ptCodigo) {
+  const mapa = {
+    "MKN 150": "🟢 Original",
+    "MKL 150": "🟡 Limón",
+    "MKC 150": "🔴 Chiles"
+  };
+  return mapa[ptCodigo] || ptCodigo;
+}
 
 async function cargarCamionesQR() {
   try {
@@ -2074,7 +2084,6 @@ async function cargarCamionesQR() {
     camionesCacheQR = ["C21","C22","C23","C24","C25","C26","C27","C28","C29","C30"].map(c => ({ camion: c }));
   }
 }
-
 function mostrarGenerarQRs() {
   ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
    "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar",
@@ -2101,12 +2110,13 @@ async function cargarCedisPendientes() {
   cont.innerHTML = '<p style="text-align:center;color:#718096;">⏳ Cargando...</p>';
 
   try {
-    const url = CONFIG.APPS_SCRIPT_URL + "?accion=cedis_pendientes_para_qr";
+    const url = CONFIG.APPS_SCRIPT_URL + "?accion=cedis_pendientes_para_qr&_t=" + Date.now();
     const data = await llamarBackend(url);
 
     if (!data.ok) throw new Error(data.error || "Error desconocido");
 
     cedisPendientesCache = data.cedis_pendientes || [];
+    stockPTCache = data.stock_inicial || {};   // 🔥 Guardar stock por PT
     renderizarListaCedis(cedisPendientesCache);
   } catch (e) {
     cont.innerHTML = '<p style="text-align:center;color:#C00000;">❌ Error: ' + e.message + '</p>';
@@ -2125,19 +2135,50 @@ function renderizarListaCedis(lista) {
     return String(a.cedis).padStart(3, "0").localeCompare(String(b.cedis).padStart(3, "0"));
   });
 
-  const totalStock = lista.reduce((s, x) => s + (x.pz_en_stock || 0), 0);
-  const totalFaltante = lista.reduce((s, x) => s + (x.pz_faltante || 0), 0);
-  const totalTarimas = lista.reduce((s, x) => s + Math.ceil((x.pz_en_stock || 0) / 5200), 0);
+  const totalPZ = lista.reduce((s, x) => s + (x.pz_pendientes || 0), 0);
+  const totalTarimas = lista.reduce((s, x) => s + Math.ceil((x.pz_pendientes || 0) / 5200), 0);
   const posUnicos = new Set(lista.map(x => x.po));
 
+  // Totales pedidos por PT
+  const pedidosPorPT = {};
+  lista.forEach(x => {
+    pedidosPorPT[x.pt_codigo] = (pedidosPorPT[x.pt_codigo] || 0) + (x.pz_pendientes || 0);
+  });
+
+  // Recuadro superior
   let html = '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px;margin-bottom:15px;font-size:12px;color:#1E40AF;">';
   html += '<b>ℹ️ ' + lista.length + ' línea(s) por cubrir</b><br>';
   html += '<span style="font-size:11px;opacity:0.85;">';
-  html += posUnicos.size + ' PO(s) · ' + totalTarimas + ' tarima(s) a generar · ' +
-          formatearNumero(totalStock, 0) + ' PZ en stock · ' +
-          '<b style="color:#C00000;">' + formatearNumero(totalFaltante, 0) + ' PZ faltantes</b>';
-  html += '</span><br>';
-  html += '<span style="font-size:11px;opacity:0.85;font-style:italic;">Stock = se saca del inventario PT. Faltante = hay que producir.</span>';
+  html += posUnicos.size + ' PO(s) · ' + totalTarimas + ' tarima(s) a generar · ' + formatearNumero(totalPZ, 0) + ' PZ totales';
+  html += '</span>';
+
+  // 🔥 Stock PT por sabor
+  const codigosPT = Object.keys(stockPTCache);
+  if (codigosPT.length > 0) {
+    html += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #BFDBFE;">';
+    html += '<b style="font-size:11px;">📦 Stock PT actual:</b>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">';
+
+    const orden = { "MKN 150": 1, "MKL 150": 2, "MKC 150": 3 };
+    codigosPT.sort((a, b) => (orden[a] || 99) - (orden[b] || 99));
+
+    codigosPT.forEach(pt => {
+      const info = stockPTCache[pt] || {};
+      const stock = Number(info.stock || 0);
+      const pedido = pedidosPorPT[pt] || 0;
+      const sabor = ptASaborFront(pt);
+      const color = stock > 0 ? '#1F7A1F' : '#C00000';
+
+      html += '<span style="display:inline-block;padding:5px 10px;background:white;border:1px solid #BFDBFE;border-radius:12px;font-size:11px;font-weight:600;color:' + color + ';">';
+      html += sabor + ': ' + formatearNumero(stock, 0) + ' PZ';
+      html += ' <span style="opacity:0.6;font-weight:400;">← pide ' + formatearNumero(pedido, 0) + '</span>';
+      html += '</span>';
+    });
+
+    html += '</div>';
+    html += '</div>';
+  }
+
   html += '</div>';
 
   // Botones
@@ -2147,25 +2188,23 @@ function renderizarListaCedis(lista) {
   html += '<button onclick="aplicarCamionATodos()" style="padding:8px 14px;background:#1F7A1F;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">🚚 Aplicar camión a seleccionados</button>';
   html += '</div>';
 
+  // Tabla
   html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
   html += '<thead><tr style="background:#1F4E79;color:white;">';
   html += '<th style="padding:8px;width:40px;"></th>';
   html += '<th style="padding:8px;text-align:left;">PO</th>';
   html += '<th style="padding:8px;text-align:left;">CEDIS</th>';
   html += '<th style="padding:8px;text-align:left;">PT</th>';
-  html += '<th style="padding:8px;text-align:center;">Stock PT</th>';
-  html += '<th style="padding:8px;text-align:center;">Faltante</th>';
+  html += '<th style="padding:8px;text-align:center;">Pedido</th>';
   html += '<th style="padding:8px;text-align:center;">Tarimas</th>';
   html += '<th style="padding:8px;text-align:center;">Camión</th>';
   html += '</tr></thead><tbody>';
 
   lista.forEach((item, idx) => {
-    const stock = item.pz_en_stock || 0;
-    const faltante = item.pz_faltante || 0;
-    const tarimas = Math.ceil(stock / 5200);
-    const sinStock = stock === 0;
+    const pzPendientes = item.pz_pendientes || 0;
+    const tarimas = Math.ceil(pzPendientes / 5200);
 
-    html += `<tr style="border-bottom:1px solid #eee;${sinStock ? 'background:#FFF5F5;' : ''}">
+    html += `<tr style="border-bottom:1px solid #eee;">
       <td style="padding:8px;text-align:center;">
         <input type="checkbox" data-idx="${idx}" class="chk-cedis"
           style="width:18px;height:18px;cursor:pointer;">
@@ -2173,9 +2212,8 @@ function renderizarListaCedis(lista) {
       <td style="padding:8px;font-family:monospace;font-size:12px;">${item.po}</td>
       <td style="padding:8px;font-weight:700;">${item.cedis}</td>
       <td style="padding:8px;font-size:12px;">${item.pt_codigo}<br><span style="color:#718096;font-size:10px;">${item.descripcion || ""}</span></td>
-      <td style="padding:8px;text-align:center;font-weight:600;color:${stock > 0 ? '#1F7A1F' : '#718096'};">${stock > 0 ? formatearNumero(stock, 0) : '—'}</td>
-      <td style="padding:8px;text-align:center;font-weight:600;color:${faltante > 0 ? '#C00000' : '#718096'};">${faltante > 0 ? formatearNumero(faltante, 0) : '—'}</td>
-      <td style="padding:8px;text-align:center;font-weight:600;">${tarimas > 0 ? tarimas : '—'}</td>
+      <td style="padding:8px;text-align:center;font-weight:600;color:#1F4E79;">${formatearNumero(pzPendientes, 0)}</td>
+      <td style="padding:8px;text-align:center;font-weight:600;">${tarimas}</td>
       <td style="padding:8px;text-align:center;">
         <input type="text" class="sel-camion" data-idx="${idx}" data-po="${item.po}"
           placeholder="C25-2026" autocomplete="off"
@@ -2198,8 +2236,7 @@ function renderizarListaCedis(lista) {
 
 function actualizarResumenSeleccion() {
   const checks = document.querySelectorAll(".chk-cedis");
-  let totalStock = 0;
-  let totalFaltante = 0;
+  let totalPedido = 0;
   let totalTarimas = 0;
   let seleccionados = 0;
   const camionesSet = new Set();
@@ -2209,9 +2246,9 @@ function actualizarResumenSeleccion() {
       const idx = Number(chk.getAttribute("data-idx"));
       const item = cedisPendientesCache[idx];
       if (item) {
-        totalStock += item.pz_en_stock || 0;
-        totalFaltante += item.pz_faltante || 0;
-        totalTarimas += Math.ceil((item.pz_en_stock || 0) / 5200);
+        const pzPendientes = item.pz_pendientes || 0;
+        totalPedido += pzPendientes;
+        totalTarimas += Math.ceil(pzPendientes / 5200);
         seleccionados++;
 
         const sel = document.querySelector(`.sel-camion[data-idx="${idx}"]`);
@@ -2233,8 +2270,7 @@ function actualizarResumenSeleccion() {
   resumen.innerHTML = `
     <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px;display:flex;justify-content:space-around;flex-wrap:wrap;gap:10px;">
       <div style="text-align:center;"><div style="font-size:11px;color:#718096;">CEDIS</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${seleccionados}</div></div>
-      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Stock PT</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${formatearNumero(totalStock, 0)}</div></div>
-      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Faltante</div><div style="font-size:20px;font-weight:700;color:${totalFaltante > 0 ? '#C00000' : '#718096'};">${formatearNumero(totalFaltante, 0)}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Pedido</div><div style="font-size:20px;font-weight:700;color:#1F4E79;">${formatearNumero(totalPedido, 0)}</div></div>
       <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Tarimas</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${totalTarimas}</div></div>
       <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Camiones</div><div style="font-size:14px;font-weight:700;color:#1F7A1F;">${camionesTxt}</div></div>
     </div>
@@ -2263,8 +2299,7 @@ async function generarAsignacionQR() {
         po: item.po,
         cedis: item.cedis,
         pt_codigo: item.pt_codigo,
-        pz_en_stock: item.pz_en_stock || 0,
-        pz_faltante: item.pz_faltante || 0,
+        pz_pendientes: item.pz_pendientes || 0,   // ← usar pz_pendientes
         fecha_captura: item.fecha_captura || "",
         camion: camion,
       });
