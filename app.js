@@ -2626,34 +2626,43 @@ function descargarAsignacionCSV() {
   }
 
   const tarimas = asignacionGenerada.tarimas;
-  const noCub = asignacionGenerada.no_cubiertos || [];
 
-  let csv = "=== TARIMAS ASIGNADAS ===\n";
-  csv += "num_tarima,camion,cedis,po,sabor,lote,pz,pt_codigo\n";
-
+  // Agrupar por camión
+  const porCamion = {};
   tarimas.forEach(t => {
-    (t.lotes || []).forEach(l => {
-      csv += `${t.num_tarima},${t.camion || ""},${t.cedis},${t.po},${t.sabor},${l.lote},${l.pz},${t.pt_codigo}\n`;
-    });
+    const camion = (t.camion || "SIN_CAMION").trim();
+    if (!porCamion[camion]) porCamion[camion] = [];
+    porCamion[camion].push(t);
   });
 
-  if (noCub.length > 0) {
-    csv += "\n=== CEDIS NO CUBIERTOS ===\n";
-    csv += "cedis,po,pt_codigo,sabor,pz_pendientes,pz_cubiertos,pz_faltantes,motivo\n";
-    noCub.forEach(n => {
-      csv += `${n.cedis},${n.po},${n.pt_codigo},${n.sabor || ""},${n.pz_pendientes},${n.pz_cubiertos || 0},${n.pz_faltantes || n.pz_pendientes},"${n.motivo || ""}"\n`;
-    });
+  const camiones = Object.keys(porCamion);
+  if (camiones.length === 0) {
+    alert("No hay tarimas para exportar");
+    return;
   }
 
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "asignacion_qr_" + new Date().toISOString().slice(0, 10) + ".csv";
-  a.click();
-  URL.revokeObjectURL(url);
-}
+  // Generar un CSV por camión
+  camiones.forEach(camion => {
+    let csv = "num_tarima,camion,cedis,po,sabor,lote,pz,pt_codigo\n";
 
+    porCamion[camion].forEach(t => {
+      (t.lotes || []).forEach(l => {
+        csv += `${t.num_tarima},${camion},${t.cedis},${t.po},${t.sabor},${l.lote},${l.pz},${t.pt_codigo}\n`;
+      });
+    });
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = camion + ".csv";   // 🔥 Nombre del camión
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  alert("✅ Descargados " + camiones.length + " archivo(s) CSV:\n" +
+        camiones.join("\n") + "\n\nGuárdalos en la carpeta asignacion-camion.");
+}
 // Exponer al scope global
 window.mostrarGenerarQRs = mostrarGenerarQRs;
 window.cargarCedisPendientes = cargarCedisPendientes;
