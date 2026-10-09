@@ -2120,25 +2120,27 @@ function renderizarListaCedis(lista) {
     return;
   }
 
-  // Ordenar por PO ascendente, luego CEDIS ascendente
   lista.sort((a, b) => {
     if (String(a.po) !== String(b.po)) return String(a.po).localeCompare(String(b.po));
     return String(a.cedis).padStart(3, "0").localeCompare(String(b.cedis).padStart(3, "0"));
   });
 
-  const totalPZ = lista.reduce((s, x) => s + (x.pz_pendientes || 0), 0);
-  const totalTarimas = lista.reduce((s, x) => s + Math.ceil((x.pz_pendientes || 0) / 5200), 0);
+  const totalStock = lista.reduce((s, x) => s + (x.pz_en_stock || 0), 0);
+  const totalFaltante = lista.reduce((s, x) => s + (x.pz_faltante || 0), 0);
+  const totalTarimas = lista.reduce((s, x) => s + Math.ceil((x.pz_en_stock || 0) / 5200), 0);
   const posUnicos = new Set(lista.map(x => x.po));
 
   let html = '<div style="background:#EFF6FF;border:1px solid #BFDBFE;border-radius:8px;padding:12px;margin-bottom:15px;font-size:12px;color:#1E40AF;">';
-  html += '<b>ℹ️ Mostrando ' + lista.length + ' línea(s) con pendiente por generar</b><br>';
+  html += '<b>ℹ️ ' + lista.length + ' línea(s) por cubrir</b><br>';
   html += '<span style="font-size:11px;opacity:0.85;">';
-  html += posUnicos.size + ' PO(s) · ' + totalTarimas + ' tarima(s) estimadas · ' + formatearNumero(totalPZ, 0) + ' PZ';
+  html += posUnicos.size + ' PO(s) · ' + totalTarimas + ' tarima(s) a generar · ' +
+          formatearNumero(totalStock, 0) + ' PZ en stock · ' +
+          '<b style="color:#C00000;">' + formatearNumero(totalFaltante, 0) + ' PZ faltantes</b>';
   html += '</span><br>';
-  html += '<span style="font-size:11px;opacity:0.85;font-style:italic;">Los CEDIS ya cubiertos por stock PT no aparecen aquí.</span>';
+  html += '<span style="font-size:11px;opacity:0.85;font-style:italic;">Stock = se saca del inventario PT. Faltante = hay que producir.</span>';
   html += '</div>';
 
-  // Botones de selección masiva
+  // Botones
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">';
   html += '<button onclick="seleccionarTodosQR(true)" style="padding:8px 14px;background:#1F4E79;color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✓ Seleccionar todo</button>';
   html += '<button onclick="seleccionarTodosQR(false)" style="padding:8px 14px;background:#F3F4F6;color:#374151;border:1px solid #D1D5DB;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">✗ Deseleccionar todo</button>';
@@ -2151,14 +2153,19 @@ function renderizarListaCedis(lista) {
   html += '<th style="padding:8px;text-align:left;">PO</th>';
   html += '<th style="padding:8px;text-align:left;">CEDIS</th>';
   html += '<th style="padding:8px;text-align:left;">PT</th>';
-  html += '<th style="padding:8px;text-align:center;">Pendientes</th>';
+  html += '<th style="padding:8px;text-align:center;">Stock PT</th>';
+  html += '<th style="padding:8px;text-align:center;">Faltante</th>';
   html += '<th style="padding:8px;text-align:center;">Tarimas</th>';
   html += '<th style="padding:8px;text-align:center;">Camión</th>';
   html += '</tr></thead><tbody>';
 
   lista.forEach((item, idx) => {
-    const tarimas = Math.ceil((item.pz_pendientes || 0) / 5200);
-    html += `<tr style="border-bottom:1px solid #eee;">
+    const stock = item.pz_en_stock || 0;
+    const faltante = item.pz_faltante || 0;
+    const tarimas = Math.ceil(stock / 5200);
+    const sinStock = stock === 0;
+
+    html += `<tr style="border-bottom:1px solid #eee;${sinStock ? 'background:#FFF5F5;' : ''}">
       <td style="padding:8px;text-align:center;">
         <input type="checkbox" data-idx="${idx}" class="chk-cedis"
           style="width:18px;height:18px;cursor:pointer;">
@@ -2166,8 +2173,9 @@ function renderizarListaCedis(lista) {
       <td style="padding:8px;font-family:monospace;font-size:12px;">${item.po}</td>
       <td style="padding:8px;font-weight:700;">${item.cedis}</td>
       <td style="padding:8px;font-size:12px;">${item.pt_codigo}<br><span style="color:#718096;font-size:10px;">${item.descripcion || ""}</span></td>
-      <td style="padding:8px;text-align:center;font-weight:600;color:#B45309;">${formatearNumero(item.pz_pendientes, 0)}</td>
-      <td style="padding:8px;text-align:center;font-weight:600;">${tarimas}</td>
+      <td style="padding:8px;text-align:center;font-weight:600;color:${stock > 0 ? '#1F7A1F' : '#718096'};">${stock > 0 ? formatearNumero(stock, 0) : '—'}</td>
+      <td style="padding:8px;text-align:center;font-weight:600;color:${faltante > 0 ? '#C00000' : '#718096'};">${faltante > 0 ? formatearNumero(faltante, 0) : '—'}</td>
+      <td style="padding:8px;text-align:center;font-weight:600;">${tarimas > 0 ? tarimas : '—'}</td>
       <td style="padding:8px;text-align:center;">
         <input type="text" class="sel-camion" data-idx="${idx}" data-po="${item.po}"
           placeholder="C25-2026" autocomplete="off"
@@ -2190,7 +2198,8 @@ function renderizarListaCedis(lista) {
 
 function actualizarResumenSeleccion() {
   const checks = document.querySelectorAll(".chk-cedis");
-  let totalPZ = 0;
+  let totalStock = 0;
+  let totalFaltante = 0;
   let totalTarimas = 0;
   let seleccionados = 0;
   const camionesSet = new Set();
@@ -2200,8 +2209,9 @@ function actualizarResumenSeleccion() {
       const idx = Number(chk.getAttribute("data-idx"));
       const item = cedisPendientesCache[idx];
       if (item) {
-        totalPZ += item.pz_pendientes || 0;
-        totalTarimas += Math.ceil((item.pz_pendientes || 0) / 5200);
+        totalStock += item.pz_en_stock || 0;
+        totalFaltante += item.pz_faltante || 0;
+        totalTarimas += Math.ceil((item.pz_en_stock || 0) / 5200);
         seleccionados++;
 
         const sel = document.querySelector(`.sel-camion[data-idx="${idx}"]`);
@@ -2223,7 +2233,8 @@ function actualizarResumenSeleccion() {
   resumen.innerHTML = `
     <div style="background:#F0FDF4;border:1px solid #BBF7D0;border-radius:8px;padding:12px;display:flex;justify-content:space-around;flex-wrap:wrap;gap:10px;">
       <div style="text-align:center;"><div style="font-size:11px;color:#718096;">CEDIS</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${seleccionados}</div></div>
-      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">PZ totales</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${formatearNumero(totalPZ, 0)}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Stock PT</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${formatearNumero(totalStock, 0)}</div></div>
+      <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Faltante</div><div style="font-size:20px;font-weight:700;color:${totalFaltante > 0 ? '#C00000' : '#718096'};">${formatearNumero(totalFaltante, 0)}</div></div>
       <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Tarimas</div><div style="font-size:20px;font-weight:700;color:#1F7A1F;">${totalTarimas}</div></div>
       <div style="text-align:center;"><div style="font-size:11px;color:#718096;">Camiones</div><div style="font-size:14px;font-weight:700;color:#1F7A1F;">${camionesTxt}</div></div>
     </div>
@@ -2252,7 +2263,8 @@ async function generarAsignacionQR() {
         po: item.po,
         cedis: item.cedis,
         pt_codigo: item.pt_codigo,
-        pz_pendientes: item.pz_pendientes,
+        pz_en_stock: item.pz_en_stock || 0,
+        pz_faltante: item.pz_faltante || 0,
         fecha_captura: item.fecha_captura || "",
         camion: camion,
       });
