@@ -2525,11 +2525,11 @@ function descargarAsignacionCSV() {
   const noCub = asignacionGenerada.no_cubiertos || [];
 
   let csv = "=== TARIMAS ASIGNADAS ===\n";
-  csv += "num_tarima,cedis,po,sabor,lote,pz,pt_codigo\n";
+  csv += "num_tarima,camion,cedis,po,sabor,lote,pz,pt_codigo\n";
 
   tarimas.forEach(t => {
     (t.lotes || []).forEach(l => {
-      csv += `${t.num_tarima},${t.cedis},${t.po},${t.sabor},${l.lote},${l.pz},${t.pt_codigo}\n`;
+      csv += `${t.num_tarima},${t.camion || ""},${t.cedis},${t.po},${t.sabor},${l.lote},${l.pz},${t.pt_codigo}\n`;
     });
   });
 
