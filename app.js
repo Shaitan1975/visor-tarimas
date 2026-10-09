@@ -2437,6 +2437,7 @@ function renderizarAsignacion(resp) {
   const cont = document.getElementById("qr-resumen");
   const tarimas = resp.tarimas || [];
   const noCubiertos = resp.no_cubiertos || [];
+  const noAsignados = resp.no_asignados || [];
 
   let html = "";
 
@@ -2449,11 +2450,12 @@ function renderizarAsignacion(resp) {
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     html += '<thead><tr style="background:#1F7A1F;color:white;">';
     html += '<th style="padding:6px;">#</th>';
+    html += '<th style="padding:6px;">Camión</th>';
     html += '<th style="padding:6px;">CEDIS</th>';
     html += '<th style="padding:6px;">PO</th>';
     html += '<th style="padding:6px;">Sabor</th>';
-    html += '<th style="padding:6px;">Lotes asignados</th>';
-    html += '<th style="padding:6px;">Total PZ</th>';
+    html += '<th style="padding:6px;">Lotes</th>';
+    html += '<th style="padding:6px;">PZ</th>';
     html += '</tr></thead><tbody>';
 
     tarimas.forEach((t, i) => {
@@ -2462,9 +2464,9 @@ function renderizarAsignacion(resp) {
       ).join("<br>");
       const totalPZ = (t.lotes || []).reduce((s, l) => s + (l.pz || 0), 0);
       const parcial = totalPZ < 5200;
-
       html += `<tr style="border-bottom:1px solid #eee;${i % 2 === 0 ? "background:#FAFBFD;" : ""}">
         <td style="padding:6px;text-align:center;font-weight:700;">${t.num_tarima}</td>
+        <td style="padding:6px;text-align:center;font-weight:700;color:#1F4E79;">${t.camion || "—"}</td>
         <td style="padding:6px;text-align:center;font-weight:600;">${t.cedis}</td>
         <td style="padding:6px;text-align:center;font-family:monospace;font-size:11px;">${t.po}</td>
         <td style="padding:6px;text-align:center;">${t.sabor}</td>
@@ -2478,7 +2480,7 @@ function renderizarAsignacion(resp) {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // BLOQUE 2: CEDIS no cubiertos
+  // BLOQUE 2: CEDIS No Cubiertos
   // ═══════════════════════════════════════════════════════════════
   if (noCubiertos.length > 0) {
     html += '<h3 style="margin:20px 0 10px;color:#C00000;font-size:15px;">❌ CEDIS No Cubiertos (' + noCubiertos.length + ')</h3>';
@@ -2493,7 +2495,6 @@ function renderizarAsignacion(resp) {
     html += '<th style="padding:6px;">Faltantes</th>';
     html += '<th style="padding:6px;">Motivo</th>';
     html += '</tr></thead><tbody>';
-
     noCubiertos.forEach((n, i) => {
       const cubiertos = n.pz_cubiertos || 0;
       const faltantes = n.pz_faltantes || n.pz_pendientes;
@@ -2511,7 +2512,63 @@ function renderizarAsignacion(resp) {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // BLOQUE 3: Alertas (tarimas parciales, etc.)
+  // 🔥 BLOQUE 3: Pendiente por Producir (NO asignados)
+  // ═══════════════════════════════════════════════════════════════
+  if (noAsignados.length > 0) {
+    const totalFaltante = noAsignados.reduce((s, x) => s + (x.pz_solicitadas || 0), 0);
+    html += '<h3 style="margin:20px 0 10px;color:#C00000;font-size:15px;">❌ Pendiente por Producir (' + noAsignados.length + ' línea(s) — ' + formatearNumero(totalFaltante, 0) + ' PZ)</h3>';
+    html += '<div style="font-size:12px;color:#718096;margin-bottom:8px;font-style:italic;">Estas piezas NO se pueden generar todavía porque no hay stock PT disponible. Hay que producirlas primero.</div>';
+    html += '<div style="overflow-x:auto;">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:#C00000;color:white;">';
+    html += '<th style="padding:6px;">CEDIS</th>';
+    html += '<th style="padding:6px;">PO</th>';
+    html += '<th style="padding:6px;">PT</th>';
+    html += '<th style="padding:6px;">Sabor</th>';
+    html += '<th style="padding:6px;">Faltante</th>';
+    html += '<th style="padding:6px;">Camión</th>';
+    html += '<th style="padding:6px;">Motivo</th>';
+    html += '</tr></thead><tbody>';
+    noAsignados.forEach((n, i) => {
+      html += `<tr style="border-bottom:1px solid #eee;${i % 2 === 0 ? "background:#FFF5F5;" : ""}">
+        <td style="padding:6px;text-align:center;font-weight:600;">${n.cedis}</td>
+        <td style="padding:6px;text-align:center;font-family:monospace;font-size:11px;">${n.po}</td>
+        <td style="padding:6px;text-align:center;font-size:11px;">${n.pt_codigo}</td>
+        <td style="padding:6px;text-align:center;">${n.sabor || ""}</td>
+        <td style="padding:6px;text-align:right;color:#C00000;font-weight:700;">${formatearNumero(n.pz_solicitadas, 0)}</td>
+        <td style="padding:6px;text-align:center;">${n.camion || "—"}</td>
+        <td style="padding:6px;font-size:11px;color:#718096;">${n.motivo || ""}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // BLOQUE 4: Resumen por Camión
+  // ═══════════════════════════════════════════════════════════════
+  if (resp.resumen_camiones && Object.keys(resp.resumen_camiones).length > 0) {
+    html += '<h3 style="margin:20px 0 10px;color:#1F4E79;font-size:15px;">🚚 Resumen por Camión</h3>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+    html += '<thead><tr style="background:#1F4E79;color:white;">';
+    html += '<th style="padding:8px;">Camión</th>';
+    html += '<th style="padding:8px;">Tarimas</th>';
+    html += '<th style="padding:8px;">Total PZ</th>';
+    html += '<th style="padding:8px;">PO(s)</th>';
+    html += '</tr></thead><tbody>';
+    for (const c in resp.resumen_camiones) {
+      const r = resp.resumen_camiones[c];
+      html += `<tr style="border-bottom:1px solid #eee;">
+        <td style="padding:8px;text-align:center;font-weight:700;color:#1F4E79;">${c}</td>
+        <td style="padding:8px;text-align:center;">${r.tarimas}</td>
+        <td style="padding:8px;text-align:center;font-weight:600;">${formatearNumero(r.pz, 0)}</td>
+        <td style="padding:8px;text-align:center;font-size:11px;">${r.pos.join(", ")}</td>
+      </tr>`;
+    }
+    html += '</tbody></table>';
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // BLOQUE 5: Alertas
   // ═══════════════════════════════════════════════════════════════
   if (resp.alertas && resp.alertas.length > 0) {
     html += '<div style="margin-top:15px;padding:10px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:8px;">';
