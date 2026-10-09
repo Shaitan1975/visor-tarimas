@@ -2305,6 +2305,85 @@ async function generarAsignacionQR() {
     statusEl.className = "send-status error";
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILIDADES DE SELECCIÓN Y CAMIONES - GENERAR QRs
+// ═══════════════════════════════════════════════════════════════════
+
+function seleccionarTodosQR(valor) {
+  document.querySelectorAll(".chk-cedis").forEach(chk => {
+    chk.checked = valor;
+  });
+  actualizarResumenSeleccion();
+}
+
+function aplicarCamionATodos() {
+  const camion = prompt("¿Qué camión aplicar a todas las filas seleccionadas?\n\nEj: C25-2026");
+  if (!camion) return;
+  const c = camion.trim();
+  if (!c) return;
+
+  // Validar que no mezcle POs
+  const posEnSeleccion = new Set();
+  document.querySelectorAll(".chk-cedis").forEach(chk => {
+    if (!chk.checked) return;
+    const idx = chk.getAttribute("data-idx");
+    const input = document.querySelector(`.sel-camion[data-idx="${idx}"]`);
+    if (!input) return;
+    const po = input.getAttribute("data-po");
+    if (po) posEnSeleccion.add(po);
+  });
+
+  if (posEnSeleccion.size > 1) {
+    alert("⚠️ Las filas seleccionadas tienen más de un PO (" + [...posEnSeleccion].join(", ") +
+          ").\nNo puedes aplicar el mismo camión a distintos POs.");
+    return;
+  }
+
+  // Aplicar
+  document.querySelectorAll(".chk-cedis").forEach(chk => {
+    if (!chk.checked) return;
+    const idx = chk.getAttribute("data-idx");
+    const input = document.querySelector(`.sel-camion[data-idx="${idx}"]`);
+    if (input) input.value = c;
+  });
+
+  actualizarResumenSeleccion();
+  validarCamiones();
+}
+
+function validarCamiones() {
+  const camionesUsados = {};
+  let conflicto = null;
+
+  document.querySelectorAll(".sel-camion").forEach(inp => {
+    const camion = (inp.value || "").trim();
+    const po = inp.getAttribute("data-po");
+    if (!camion) return;
+    if (camionesUsados[camion] && camionesUsados[camion] !== po) {
+      conflicto = { camion, po1: camionesUsados[camion], po2: po };
+    } else {
+      camionesUsados[camion] = po;
+    }
+  });
+
+  if (conflicto) {
+    alert("⚠️ El camión " + conflicto.camion + " ya está asignado al PO " +
+          conflicto.po1 + ". No puedes mezclar dos POs en el mismo camión.");
+    document.querySelectorAll(".sel-camion").forEach(inp => {
+      if ((inp.value || "").trim() === conflicto.camion &&
+          inp.getAttribute("data-po") === conflicto.po2) {
+        inp.value = "";
+      }
+    });
+  }
+}
+
+// Exponer al scope global
+window.seleccionarTodosQR = seleccionarTodosQR;
+window.aplicarCamionATodos = aplicarCamionATodos;
+window.validarCamiones = validarCamiones;
+
 function aplicarCamionATodos() {
   const camion = prompt("¿Qué camión aplicar a todas las filas seleccionadas?\n\nEj: C25-2026");
   if (!camion) return;
