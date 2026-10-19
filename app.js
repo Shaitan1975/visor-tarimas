@@ -360,8 +360,8 @@ const App = (() => {
       if (!info) return;
       const btn = document.createElement("button");
       btn.className = "btn-evento";
-      btn.style.background = info.color;
-      btn.innerHTML = `${info.icono}<br/><span>${info.etiqueta}</span>`;
+      btn.style.background = "linear-gradient(135deg, " + info.color + ", " + info.color + "cc)";
+      btn.innerHTML = "<b>" + esc(info.etiqueta) + "</b><small>Lugar: " + esc(info.ubicacion.replace("_", " ")) + "</small>";
       btn.addEventListener("click", () => {
         modoSeleccionado = ev;
         aplicarModo(info);

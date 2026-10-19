@@ -12,17 +12,19 @@
 <link rel="apple-touch-icon" href="./icono_192x192.png">
 
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="styles.css?v=24">
+<link rel="stylesheet" href="styles.css?v=25">
 </head>
 <body class="scanner-body" id="scanner-body">
 
 <header class="app-header" id="app-header">
   <div class="header-left">
     <span class="header-logo">📦</span>
-    <span class="header-title">Visor Tarimas</span>
+    <div class="header-textos">
+      <span class="header-title">Visor Tarimas</span>
+      <span id="user-info" class="user-info"></span>
+    </div>
   </div>
   <div class="header-right">
-    <span id="user-info" class="user-info"></span>
     <button id="btn-mi-pass" class="btn-logout" title="Cambiar mi contraseña">🔑 Contraseña</button>
     <button id="btn-logout" class="btn-logout">Salir</button>
   </div>
@@ -42,26 +44,17 @@
       <p class="selector-descripcion">Selecciona el tipo de evento</p>
       <div id="lista-eventos" class="lista-eventos"></div>
       <hr style="margin: 25px 0; border: 0; border-top: 1px solid #ddd;">
-      <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-      <button id="btn-pedidos" class="btn-evento hidden" style="background:#2C5282;flex:1;min-width:140px;max-width:180px;" onclick="mostrarListaPedidos()">
-        <span style="font-size:24px;">📦</span><br/>
-        <span>Pedidos</span><br/>
-        <span style="font-size:11px;opacity:0.85;">Calcular insumos</span>
+      <div class="tiles">
+      <button id="btn-pedidos" class="tile tile-azul hidden" onclick="mostrarListaPedidos()">
+        <b>📦 Pedidos</b><small>Calcular insumos</small>
       </button>
-    
-      <button id="btn-generar-qr" class="btn-evento hidden" style="background:#1F7A1F;flex:1;min-width:140px;max-width:180px;" onclick="mostrarGenerarQRs()">
-        <span style="font-size:24px;">🖨️</span><br/>
-        <span>Generar QRs</span><br/>
-        <span style="font-size:11px;opacity:0.85;">Tarimas PT</span>
+      <button id="btn-generar-qr" class="tile tile-verde hidden" onclick="mostrarGenerarQRs()">
+        <b>🖨️ Generar QRs</b><small>Asignación y etiquetas</small>
       </button>
-
-      <button id="btn-usuarios" class="btn-evento hidden" style="background:#6D28D9;flex:1;min-width:140px;max-width:180px;">
-        <span style="font-size:24px;">👥</span><br/>
-        <span>Usuarios</span><br/>
-        <span style="font-size:11px;opacity:0.85;">Planta, CEDIS, aduana</span>
+      <button id="btn-usuarios" class="tile tile-morado hidden">
+        <b>👥 Usuarios</b><small>Planta, CEDIS, aduana</small>
       </button>
     </div>
-  
   </section>
 
   <!-- Vista: CONTRASEÑA (propia, obligatoria o restablecer) -->
@@ -491,7 +484,7 @@ CHILI
 
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="app.js?v=24"></script>
+<script src="app.js?v=25"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     App.initScanner();

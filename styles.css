@@ -1269,3 +1269,36 @@ details summary {
 .check-evento { display: flex !important; gap: 8px; align-items: center; font-weight: 400 !important; margin: 6px 0; }
 .check-evento input { width: 20px; height: 20px; }
 .label-ayuda { display: block; font-size: 12px; color: #6B7280; margin-top: 4px; }
+
+
+/* ═══════════════════════════════════════════════════════════
+   v25 — Estilo igual a Almacén / Mantenimiento (mismos colores Visor)
+   ═══════════════════════════════════════════════════════════ */
+.app-header { padding: 10px 14px; gap: 8px; }
+.header-left { min-width: 0; gap: 10px; }
+.header-logo { font-size: 26px; }
+.header-textos { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.header-title { font-size: 16px; white-space: nowrap; }
+.header-textos .user-info { font-size: 11.5px; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-right { gap: 8px; flex: none; }
+.btn-logout { padding: 7px 11px; border-radius: 8px; font-weight: 600; }
+
+#view-selector .selector-container h2 { font-size: 20px; text-align: left; margin-bottom: 2px; }
+#view-selector .selector-descripcion { text-align: left; margin-top: 0; }
+.lista-eventos { gap: 10px; }
+.btn-evento { padding: 16px 14px; border-radius: 12px; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+.btn-evento b { display: block; font-size: 16px; letter-spacing: .3px; }
+.btn-evento small { display: block; font-size: 12px; font-weight: 500; opacity: .85; margin-top: 3px; }
+
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile {
+  border: 1px solid; border-radius: 12px; padding: 14px 10px; min-height: 64px;
+  font-family: inherit; cursor: pointer; text-align: center; transition: transform .1s;
+}
+.tile:active { transform: scale(.97); }
+.tile b { display: block; font-size: 15px; }
+.tile small { display: block; font-size: 11.5px; opacity: .8; margin-top: 3px; }
+.tile-azul { background: #EFF6FF; border-color: #BFDBFE; color: #1F4E79; }
+.tile-verde { background: #F0FDF4; border-color: #BBF7D0; color: #166534; }
+.tile-morado { background: #F5F3FF; border-color: #DDD6FE; color: #5B21B6; }
+.tile.hidden { display: none; }
