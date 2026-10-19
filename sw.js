@@ -1,60 +1,55 @@
-// ═══════════════════════════════════════════════════════════
-// SERVICE WORKER - Visor Tarimas v8
-// ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// VISOR TARIMAS - SERVICE WORKER v22
+// Red primero para la app (así los celulares siempre reciben la última
+// versión); si no hay internet, se usa la copia guardada.
+// Las llamadas al servidor (script.google.com) nunca se guardan.
+// Al publicar cambios: sube el número de CACHE.
+// ═══════════════════════════════════════════════════════════════════
 
-const CACHE_VERSION = 'visor-v36';   
-const CACHE_NAME = CACHE_VERSION;
-
-const ARCHIVOS_CACHE = [
-  './',
-  './index.html',
-  './scanner.html',
-  './app.js',
-  './styles.css',
-  './manifest.json',
-  './usuarios.json',
-  './icono_192x192.png',   // ⚠️ NUEVO: cachear el favicon
-  './icono_512x512.png'    // ⚠️ NUEVO: cachear el favicon grande
+const CACHE = "visor-v22-20261018";
+const ARCHIVOS = [
+  "./",
+  "./index.html",
+  "./scanner.html",
+  "./app.js",
+  "./styles.css",
+  "./manifest.json",
+  "./icono_192x192.png"
 ];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ARCHIVOS_CACHE))
-  );
+self.addEventListener("install", (e) => {
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ARCHIVOS)).catch(() => {}));
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((names) => {
-      return Promise.all(
-        names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))
-      );
-    }).then(() => self.clients.claim())
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
+    )
   );
+  self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  const url = event.request.url;
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;   // servidor y CDNs: directo a la red
 
-  if (url.includes('script.google.com') ||
-      url.includes('cdn.jsdelivr.net') ||
-      url.includes('cdnjs.cloudflare.com')) {
-    return;
-  }
-
-  event.respondWith(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.match(event.request).then((cachedResponse) => {
-        const fetchPromise = fetch(event.request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            cache.put(event.request, networkResponse.clone());
-          }
-          return networkResponse;
-        }).catch(() => cachedResponse);
-
-        return cachedResponse || fetchPromise;
-      });
-    })
+  e.respondWith(
+    fetch(req)
+      .then((resp) => {
+        if (resp && resp.status === 200) {
+          const copia = resp.clone();
+          caches.open(CACHE).then((c) => c.put(req, copia));
+        }
+        return resp;
+      })
+      .catch(() =>
+        caches.match(req, { ignoreSearch: true }).then((r) =>
+          r || (req.mode === "navigate" ? caches.match("./index.html") : undefined)
+        )
+      )
   );
 });

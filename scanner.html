@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="./icono_192x192.png">
 
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body class="scanner-body" id="scanner-body">
 
@@ -23,6 +23,7 @@
   </div>
   <div class="header-right">
     <span id="user-info" class="user-info"></span>
+    <button id="btn-mi-pass" class="btn-logout" title="Cambiar mi contraseña">🔑 Contraseña</button>
     <button id="btn-logout" class="btn-logout">Salir</button>
   </div>
 </header>
@@ -53,8 +54,105 @@
         <span>Generar QRs</span><br/>
         <span style="font-size:11px;opacity:0.85;">Tarimas PT</span>
       </button>
+
+      <button id="btn-usuarios" class="btn-evento hidden" style="background:#6D28D9;flex:1;min-width:140px;max-width:180px;">
+        <span style="font-size:24px;">👥</span><br/>
+        <span>Usuarios</span><br/>
+        <span style="font-size:11px;opacity:0.85;">Planta, CEDIS, aduana</span>
+      </button>
     </div>
   
+  </section>
+
+  <!-- Vista: CONTRASEÑA (propia, obligatoria o restablecer) -->
+  <section id="view-password" class="view-section hidden">
+    <div class="manual-container">
+      <h2 id="pass-titulo">🔑 Cambiar mi contraseña</h2>
+      <p id="pass-aviso" class="aviso-cedis hidden">Entraste con una contraseña temporal. Crea una tuya para continuar (mínimo 8 caracteres).</p>
+      <p id="pass-aviso-temporal" class="aviso-cedis hidden">Será temporal: la persona deberá cambiarla la primera vez que entre.</p>
+      <input type="hidden" id="pass-objetivo">
+      <div class="input-group" id="pass-grupo-actual">
+        <label for="pass-actual" id="pass-actual-label">Contraseña actual *</label>
+        <input type="password" id="pass-actual" autocomplete="current-password">
+      </div>
+      <div class="input-group">
+        <label for="pass-nueva1">Contraseña nueva * (mínimo 8)</label>
+        <input type="password" id="pass-nueva1" autocomplete="new-password">
+      </div>
+      <div class="input-group">
+        <label for="pass-nueva2">Repite la nueva *</label>
+        <input type="password" id="pass-nueva2" autocomplete="new-password">
+      </div>
+      <p id="pass-status" class="send-status"></p>
+      <button id="btn-guardar-pass" class="btn-primary btn-large">✅ Guardar</button>
+      <button id="btn-pass-cancelar" class="btn-secondary">Cancelar</button>
+    </div>
+  </section>
+
+  <!-- Vista: USUARIOS (admin) -->
+  <section id="view-usuarios" class="view-section hidden">
+    <div class="manual-container">
+      <div class="estatus-header">
+        <h2>👥 Usuarios</h2>
+        <button id="btn-cerrar-usuarios" class="btn-cerrar">✖</button>
+      </div>
+      <button id="btn-nuevo-usuario" class="btn-primary" style="margin-bottom:12px;">+ Nuevo usuario</button>
+      <div id="lista-usuarios"></div>
+    </div>
+  </section>
+
+  <!-- Vista: FORMULARIO DE USUARIO -->
+  <section id="view-usuario-form" class="view-section hidden">
+    <div class="manual-container">
+      <h2 id="usuario-form-titulo">👤 Nuevo usuario</h2>
+      <input type="hidden" id="usuario-form-modo">
+      <div class="input-group">
+        <label for="usuario-form-rol">Tipo de usuario *</label>
+        <select id="usuario-form-rol" class="manual-select">
+          <option value="planta">Planta — salida de tarimas</option>
+          <option value="cedis">CEDIS — recibe las tarimas de su CEDIS</option>
+          <option value="aduana">Aduana — entrada y salida de aduana</option>
+          <option value="supervisor">Supervisor — todos los eventos</option>
+          <option value="gerencia">Gerencia — además pedidos, QRs y cancelar</option>
+          <option value="admin">Admin — todo, incluye usuarios</option>
+        </select>
+      </div>
+      <div class="input-group hidden" id="grupo-usuario-cedis">
+        <label for="usuario-form-cedis">Número de CEDIS * (últimos 3 dígitos, ej. 004)</label>
+        <input type="text" id="usuario-form-cedis" inputmode="numeric" maxlength="5" placeholder="004">
+        <span class="label-ayuda">El usuario será <b>cedis004</b>. Pueden entrar escribiendo solo <b>004</b>.</span>
+      </div>
+      <div class="input-group" id="grupo-usuario-nombre-login">
+        <label for="usuario-form-usuario">Usuario *</label>
+        <input type="text" id="usuario-form-usuario" placeholder="ej. jperez (sin espacios ni acentos)" autocomplete="off" autocapitalize="none">
+      </div>
+      <div class="input-group">
+        <label for="usuario-form-nombre">Nombre</label>
+        <input type="text" id="usuario-form-nombre" placeholder="ej. Juan Pérez · o CEDIS 004 - Greenbrier">
+      </div>
+      <div class="input-group" id="grupo-usuario-eventos">
+        <label>Eventos que puede registrar</label>
+        <label class="check-evento"><input type="checkbox" class="chk-evento" value="SALIDA_PLANTA"> 🚚 Salida de planta</label>
+        <label class="check-evento"><input type="checkbox" class="chk-evento" value="ADUANA_ENTRADA"> 🛃 Entrada a aduana</label>
+        <label class="check-evento"><input type="checkbox" class="chk-evento" value="ADUANA_SALIDA"> 📦 Salida de aduana</label>
+        <label class="check-evento"><input type="checkbox" class="chk-evento" value="ENTREGA_CEDIS"> ✅ Entrega en CEDIS</label>
+        <label class="check-evento"><input type="checkbox" class="chk-evento" value="DEVOLUCION"> 🔄 Devolución</label>
+      </div>
+      <div id="grupo-usuario-pass">
+        <div class="input-group">
+          <label for="usuario-form-pass1">Contraseña temporal * (mínimo 8)</label>
+          <input type="password" id="usuario-form-pass1" autocomplete="new-password">
+        </div>
+        <div class="input-group">
+          <label for="usuario-form-pass2">Repite la contraseña *</label>
+          <input type="password" id="usuario-form-pass2" autocomplete="new-password">
+        </div>
+        <span class="label-ayuda">Mándasela a la persona. La primera vez que entre, la app le pedirá crear la suya.</span>
+      </div>
+      <p id="usuario-form-status" class="send-status"></p>
+      <button id="btn-guardar-usuario" class="btn-primary btn-large">✅ Guardar</button>
+      <button id="btn-cancelar-usuario" class="btn-secondary">Cancelar</button>
+    </div>
   </section>
 
   <!-- Vista: LISTO PARA ESCANEAR -->
@@ -390,7 +488,7 @@ CHILI
 
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=22"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     App.initScanner();

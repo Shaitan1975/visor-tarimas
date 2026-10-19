@@ -1,10 +1,14 @@
 // ═══════════════════════════════════════════════════════════════════
-// VISOR TARIMAS - LÓGICA DE LA PWA (v28)
+// VISOR TARIMAS - LÓGICA DE LA PWA (v29)
+// v29: login en el servidor con token (igual que Almacén y Mantenimiento),
+//      usuarios de CEDIS, cambio obligatorio de contraseña, sin JSONP
 // Multi-CEDIS + Cálculo por PO (salidas de EVENTOS) + FIFO
 // ═══════════════════════════════════════════════════════════════════
 
 const CONFIG = {
   APPS_SCRIPT_URL: `https://script.google.com/macros/s/AKfycbwjCqDsjwCGqxHsXpUk9za12KBC_iLdfJaKGPBTX--eQ4vXHzmT3ZKSB-6LexLFi0nH/exec`,
+  // Solo para leer etiquetas viejas cifradas. La seguridad ya NO depende de esto:
+  // el servidor valida usuario, permisos y que la tarima exista.
   CLAVE_EMPRESA: "MediesE2026$Almacen",
   SALT_PBKDF2: "salt-fijo-empresa-2026",
   ITERACIONES: 100000,
@@ -60,25 +64,79 @@ const App = (() => {
     return Array.from(new Uint8Array(bits)).map(b => b.toString(16).padStart(2, "0")).join("");
   }
 
+  function esc(t) {
+    return String(t === null || t === undefined ? "" : t)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function sesionValida() {
+    const s = getSession();
+    if (!s || !s.token) return null;            // sesiones viejas (sin token) no sirven
+    if (s.expira && Date.now() > s.expira) { clearSession(); return null; }
+    return s;
+  }
+
+  function sesionExpirada() {
+    clearSession();
+    alert("Tu sesión expiró. Vuelve a entrar.");
+    window.location.href = "index.html";
+  }
+
+  // Todas las llamadas llevan el token; el servidor decide usuario, rol y permisos
+  async function api(accion, data, metodo) {
+    const ses = getSession();
+    const token = ses && ses.token ? ses.token : "";
+    let r;
+    if ((metodo || "GET") === "GET") {
+      const limpio = {};
+      Object.entries(data || {}).forEach(([k, v]) => { if (v !== undefined && v !== null && v !== "") limpio[k] = v; });
+      r = await fetch(CONFIG.APPS_SCRIPT_URL + "?" + new URLSearchParams({ accion: accion, token: token, ...limpio }).toString(),
+                      { cache: "no-store", redirect: "follow" });
+    } else {
+      r = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow",
+        body: JSON.stringify({ accion: accion, data: data || {}, token: token }),
+      });
+    }
+    const json = await r.json();
+    revisarSesion(json, accion);
+    return json;
+  }
+
+  function revisarSesion(json, accion) {
+    if (!json || accion === "login") return;
+    if (json.error === "SESION_EXPIRADA") sesionExpirada();
+    else if (json.error === "DEBE_CAMBIAR_PASSWORD") abrirPassword(null, true);
+  }
+
+  async function pbkdf2Hex(password, saltHex) { return pbkdf2Hash(password, saltHex); }
+
+  function nuevoSalt() {
+    return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function prepararPassword(p1, p2) {
+    if (!p1 || p1.length < 8) return { error: "La contraseña debe tener al menos 8 caracteres" };
+    if (p1 !== p2) return { error: "Las contraseñas no coinciden" };
+    const salt = nuevoSalt();
+    return { salt: salt, hash: await pbkdf2Hash(p1, salt) };
+  }
+
+  // Login: el servidor da el salt, el navegador calcula el hash y el servidor lo compara
   async function verificarUsuario(usuario, password) {
     try {
-      const resp = await fetch("usuarios.json?t=" + Date.now(), {
-        cache: "no-store",
-        headers: { "Cache-Control": "no-cache" }
-      });
-      const usuarios = await resp.json();
-      const user = usuarios.find(u => u.user === usuario.toLowerCase().trim());
-      if (!user) return null;
-      const hashCalc = await pbkdf2Hash(password, user.salt);
-      if (hashCalc === user.hash) {
-        return {
-          user: user.user, nombre: user.nombre, rol: user.rol,
-          ubicacion: user.ubicacion || "planta",
-          eventos_permitidos: user.eventos_permitidos || ["SALIDA_PLANTA"],
-        };
-      }
-      return null;
-    } catch (e) { return null; }
+      const u = String(usuario || "").trim();
+      if (!u || !password) return { error: "Escribe usuario y contraseña" };
+      const s = await api("obtener_salt", { usuario: u });
+      if (!s.ok || !s.salt) return { error: s.error || "No se pudo conectar con el servidor" };
+      const hash = await pbkdf2Hash(password, s.salt);
+      const r = await api("login", { usuario: s.usuario || u, hash: hash }, "POST");
+      if (!r.ok) return { error: r.error || "Usuario o contraseña incorrectos" };
+      return Object.assign({}, r.usuario, { token: r.token, expira: Date.now() + (r.expira_seg || 21600) * 1000 });
+    } catch (e) {
+      return { error: "No se pudo conectar con el servidor" };
+    }
   }
 
   function descifrarBlobQR(blobB64, password) {
@@ -134,7 +192,8 @@ const App = (() => {
   }
 
   function initLogin() {
-    if (getSession()) { window.location.href = "scanner.html"; return; }
+    if (sesionValida()) { window.location.href = "scanner.html"; return; }
+    clearSession();
     const form = document.getElementById("login-form");
     const errorMsg = document.getElementById("error-msg");
     const btn = form.querySelector("button");
@@ -147,11 +206,11 @@ const App = (() => {
       const usuario = document.getElementById("usuario").value;
       const password = document.getElementById("password").value;
       const user = await verificarUsuario(usuario, password);
-      if (user) {
+      if (user && !user.error) {
         setSession(user);
         window.location.href = "scanner.html";
       } else {
-        errorMsg.textContent = "Usuario o contraseña incorrectos";
+        errorMsg.textContent = (user && user.error) || "Usuario o contraseña incorrectos";
         btn.disabled = false;
         btn.textContent = "Entrar";
       }
@@ -162,10 +221,25 @@ const App = (() => {
   let scanning = false;
 
   function initScanner() {
-    const session = getSession();
-    if (!session) { window.location.href = "index.html"; return; }
+    const session = sesionValida();
+    if (!session) { clearSession(); window.location.href = "index.html"; return; }
 
-    document.getElementById("user-info").textContent = `${session.nombre} (${session.rol})`;
+    document.getElementById("user-info").textContent = session.nombre + " (" + (NOMBRE_ROL[session.rol] || session.rol) + ")";
+    document.getElementById("btn-mi-pass").addEventListener("click", () => abrirPassword(null, false));
+    document.getElementById("btn-guardar-pass").addEventListener("click", guardarPassword);
+    document.getElementById("btn-usuarios").addEventListener("click", verUsuarios);
+    document.getElementById("btn-nuevo-usuario").addEventListener("click", () => abrirFormUsuario(null));
+    document.getElementById("btn-guardar-usuario").addEventListener("click", guardarUsuario);
+    document.getElementById("btn-cancelar-usuario").addEventListener("click", verUsuarios);
+    document.getElementById("btn-cerrar-usuarios").addEventListener("click", () => iniciarFlujo(getSession()));
+    document.getElementById("usuario-form-rol").addEventListener("change", actualizarFormRol);
+    if (session.rol === "admin") document.getElementById("btn-usuarios").classList.remove("hidden");
+    // Contraseña temporal: lo primero es cambiarla
+    if (session.cambiar_password) { abrirPassword(null, true); return iniciarResto(session); }
+    iniciarResto(session);
+  }
+
+  function iniciarResto(session) {
 
     if (session.rol === "admin") {
       document.getElementById("btn-registro-manual").classList.remove("hidden");
@@ -179,7 +253,9 @@ const App = (() => {
       if (btnGenQR) btnGenQR.classList.remove("hidden");
     }
 
-    document.getElementById("btn-logout").addEventListener("click", () => {
+    document.getElementById("btn-logout").addEventListener("click", async () => {
+      if (!confirm("¿Cerrar sesión?")) return;
+      try { await api("logout", {}, "POST"); } catch (e) {}
       clearSession();
       window.location.href = "index.html";
     });
@@ -241,19 +317,20 @@ const App = (() => {
       if (estatusVisible) verEstatusCamiones();
     });
 
-    iniciarFlujo(session);
+    if (!session.cambiar_password) iniciarFlujo(session);
   }
 
   function iniciarFlujo(session) {
     const params = new URLSearchParams(window.location.search);
     const lugarParam = params.get("lugar");
-    if (lugarParam && MAPA_LUGARES[lugarParam]) {
+    const permitidos = session.eventos_permitidos || [];
+    if (lugarParam && MAPA_LUGARES[lugarParam] && permitidos.includes(MAPA_LUGARES[lugarParam])) {
       modoSeleccionado = MAPA_LUGARES[lugarParam];
       aplicarModo(EVENTOS[modoSeleccionado]);
       mostrarVista("view-ready");
       return;
     }
-    const eventos = session.eventos_permitidos || ["SALIDA_PLANTA"];
+    const eventos = permitidos;
     if (eventos.length === 0) {
       alert("Tu usuario no tiene eventos asignados.");
       clearSession();
@@ -270,13 +347,7 @@ const App = (() => {
   }
 
   function mostrarSelector(eventos) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
-     "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar",
-     "pantalla-pedidos", "pantalla-form-pedido", "pantalla-detalle-pedido"]
-      .forEach(v => {
-        const el = document.getElementById(v);
-        if (el) el.classList.add("hidden");
-      });
+    document.querySelectorAll("section.view-section").forEach(el => el.classList.add("hidden"));
 
     const banner = document.getElementById("modo-indicador");
     if (banner) banner.style.display = "none";
@@ -326,13 +397,9 @@ const App = (() => {
   }
 
   function mostrarVista(id) {
-    ["view-ready", "view-scanning", "view-loading", "view-result", "view-selector",
-     "view-estatus", "view-detalle-camion", "view-manual", "view-cancelar"]
-      .forEach(v => {
-        const el = document.getElementById(v);
-        if (el) el.classList.add("hidden");
-      });
+    document.querySelectorAll("section.view-section").forEach(el => el.classList.add("hidden"));
     document.getElementById(id).classList.remove("hidden");
+    window.scrollTo(0, 0);
     if (id === "view-ready") actualizarProgresoPantalla();
   }
 
@@ -412,10 +479,25 @@ const App = (() => {
 
       if (datos.lotes && datos.lotes.length > 0) payload.lotes = datos.lotes;
 
-      const url = CONFIG.APPS_SCRIPT_URL + "?accion=evento&data=" + encodeURIComponent(JSON.stringify(payload));
-      const resp = await jsonp(url);
+      // CEDIS: quién recibe físicamente (el usuario del CEDIS es compartido)
+      if (modoSeleccionado === "ENTREGA_CEDIS" && session.rol === "cedis") {
+        let recibio = "";
+        try { recibio = localStorage.getItem("visor_recibio") || ""; } catch (e) {}
+        recibio = prompt("¿Quién recibe? (nombre)", recibio);
+        if (recibio === null || !recibio.trim()) { mostrarVista("view-ready"); return; }
+        try { localStorage.setItem("visor_recibio", recibio.trim()); } catch (e) {}
+        payload.recibio = recibio.trim();
+      }
+
+      const resp = await api("evento", { data: JSON.stringify(payload) });
 
       if (!resp.ok) {
+        if (resp.error === "SESION_EXPIRADA" || resp.error === "DEBE_CAMBIAR_PASSWORD") return;
+        if (resp.otro_cedis) {
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+          setTimeout(() => { alert("⛔ " + resp.error); mostrarVista("view-ready"); }, 300);
+          return;
+        }
         if (resp.duplicado) {
           setTimeout(() => {
             alert("⚠️ TARIMA YA REGISTRADA\n\n" + resp.mensaje + "\n\nRegistrada el: " + resp.fecha_anterior);
@@ -726,30 +808,16 @@ const App = (() => {
     }
   }
 
-  function jsonp(url) {
-    return new Promise((resolve, reject) => {
-      const callbackName = "jsonp_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-      window[callbackName] = (data) => {
-        delete window[callbackName];
-        if (document.body.contains(script)) document.body.removeChild(script);
-        resolve(data);
-      };
-      const script = document.createElement("script");
-      script.src = url + "&callback=" + callbackName;
-      script.onerror = () => {
-        delete window[callbackName];
-        if (document.body.contains(script)) document.body.removeChild(script);
-        reject(new Error("Error de red"));
-      };
-      document.body.appendChild(script);
-      setTimeout(() => {
-        if (window[callbackName]) {
-          delete window[callbackName];
-          if (document.body.contains(script)) document.body.removeChild(script);
-          reject(new Error("Timeout"));
-        }
-      }, 60000);
-    });
+  // Antes era JSONP. Ahora es fetch normal con el token de sesión.
+  // Se conserva el nombre para no tocar las llamadas existentes.
+  async function jsonp(url) {
+    const ses = getSession();
+    const u = url + (url.indexOf("?") >= 0 ? "&" : "?") + "token=" + encodeURIComponent(ses && ses.token ? ses.token : "");
+    const r = await fetch(u, { cache: "no-store", redirect: "follow" });
+    const json = await r.json();
+    const accion = (url.match(/[?&]accion=([^&]+)/) || [])[1] || "";
+    revisarSesion(json, accion);
+    return json;
   }
 
   async function verEstatusCamiones() {
@@ -797,7 +865,7 @@ const App = (() => {
     card.className = "camion-card";
     if (camion.activo) card.classList.add("activo");
     const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
-    let html = '<div class="camion-titulo">🚚 ' + camion.camion + ' <span class="camion-total">(' + camion.total_tarimas + ' tarimas)</span></div>';
+    let html = '<div class="camion-titulo">🚚 ' + esc(camion.camion) + ' <span class="camion-total">(' + esc(camion.total_tarimas) + ' tarimas)</span></div>';
     html += '<div class="eventos-lista">';
     EVS.forEach(ev => {
       const info = EVENTOS[ev];
@@ -842,7 +910,7 @@ const App = (() => {
     const EVS = ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"];
 
     let html = '<div class="detalle-info">' +
-               '<p><b>PO:</b> ' + (data.po || '-') + '</p>' +
+               '<p><b>PO:</b> ' + esc(data.po || '-') + '</p>' +
                '<p><b>Total tarimas:</b> ' + data.total_tarimas + '</p>' +
                '</div>';
 
@@ -864,19 +932,16 @@ const App = (() => {
 
       if (e.registradas.length > 0) {
         html += '<details open><summary>Ver registradas (' + e.registradas.length + ')</summary>';
-        if (!puedeCancelar) {
+        if (!puedeCancelar && session && session.rol !== "cedis") {
           html += '<p style="font-size:12px;color:#92400E;background:#FEF3C7;padding:8px;border-radius:6px;margin:8px 0;">' +
                   '⚠️ Solo <b>Gerencia</b> y <b>Admin</b> pueden cancelar</p>';
         }
         html += '<ul class="lista-registradas">';
         e.registradas.forEach(qr => {
-          html += '<li><span class="qr-texto">' + qr + '</span>';
+          html += '<li><span class="qr-texto">' + esc(qr) + '</span>';
           if (puedeCancelar) {
-            const escQr = qr.replace(/'/g, "\\'");
-            const escCamion = data.camion.replace(/'/g, "\\'");
-            html += '<button class="btn-cancelar-chico" ' +
-                    'onclick="event.stopPropagation(); App.abrirFormularioCancelar(\'' +
-                    escCamion + '\', \'' + ev + '\', \'' + escQr + '\')">❌ Cancelar</button>';
+            html += '<button class="btn-cancelar-chico" data-camion="' + esc(data.camion) + '" data-ev="' + esc(ev) +
+                    '" data-qr="' + esc(qr) + '">❌ Cancelar</button>';
           }
           html += '</li>';
         });
@@ -885,7 +950,7 @@ const App = (() => {
 
       if (e.faltantes.length > 0 && e.faltantes.length <= 30) {
         html += '<details><summary>Ver faltantes (' + e.faltantes.length + ')</summary><ul class="lista-faltantes">';
-        e.faltantes.forEach(q => { html += '<li>' + q + '</li>'; });
+        e.faltantes.forEach(q => { html += '<li>' + esc(q) + '</li>'; });
         html += '</ul></details>';
       } else if (e.faltantes.length > 30) {
         html += '<p class="texto-faltantes">Faltan ' + e.faltantes.length + ' tarimas</p>';
@@ -894,7 +959,179 @@ const App = (() => {
     });
 
     contenedor.innerHTML = html;
+    contenedor.querySelectorAll(".btn-cancelar-chico").forEach(b => b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      abrirFormularioCancelar(b.dataset.camion, b.dataset.ev, b.dataset.qr);
+    }));
+    if (session && session.rol === "cedis") {
+      contenedor.insertAdjacentHTML("afterbegin", '<p class="aviso-cedis">Solo ves las tarimas que van a tu CEDIS (' + esc(session.cedis) + ').</p>');
+    }
     mostrarVista("view-detalle-camion");
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // CONTRASEÑA Y USUARIOS
+  // ═══════════════════════════════════════════════════════════════
+
+  const NOMBRE_ROL = { planta: "Planta", aduana: "Aduana", cedis: "CEDIS", supervisor: "Supervisor", gerencia: "Gerencia", admin: "Admin" };
+  const $ = id => document.getElementById(id);
+  function msg(el, t, tipo) { el.textContent = t || ""; el.className = "send-status" + (tipo ? " " + tipo : ""); }
+  let usuariosCache = [];
+
+  function abrirPassword(objetivo, obligatoria) {
+    const propia = !objetivo;
+    $("pass-objetivo").value = objetivo || "";
+    $("pass-titulo").textContent = obligatoria ? "🔑 Crea tu contraseña" : (propia ? "🔑 Cambiar mi contraseña" : "🔑 Restablecer contraseña de " + objetivo);
+    $("pass-aviso").classList.toggle("hidden", !obligatoria);
+    $("pass-aviso-temporal").classList.toggle("hidden", propia);
+    $("pass-grupo-actual").classList.toggle("hidden", !propia);
+    $("pass-actual-label").textContent = obligatoria ? "Contraseña temporal que te dieron *" : "Contraseña actual *";
+    ["pass-actual", "pass-nueva1", "pass-nueva2"].forEach(id => { $(id).value = ""; });
+    msg($("pass-status"), "");
+    $("btn-pass-cancelar").classList.toggle("hidden", !!obligatoria);
+    $("btn-pass-cancelar").onclick = () => (propia ? iniciarFlujo(getSession()) : verUsuarios());
+    $("modo-indicador").style.display = "none";
+    mostrarVista("view-password");
+  }
+
+  async function guardarPassword() {
+    const st = $("pass-status");
+    const objetivo = $("pass-objetivo").value;
+    const btn = $("btn-guardar-pass");
+    btn.disabled = true;
+    try {
+      msg(st, "Protegiendo contraseña...");
+      const p = await prepararPassword($("pass-nueva1").value, $("pass-nueva2").value);
+      if (p.error) return msg(st, "❌ " + p.error, "error");
+      let r;
+      if (!objetivo) {
+        const ses = getSession();
+        const actual = $("pass-actual").value;
+        if (!actual) return msg(st, "❌ Escribe tu contraseña actual", "error");
+        const s = await api("obtener_salt", { usuario: ses.user });
+        const hashActual = await pbkdf2Hash(actual, s.salt);
+        r = await api("cambiar_mi_password", { hash_actual: hashActual, salt: p.salt, hash: p.hash }, "POST");
+      } else {
+        r = await api("restablecer_password", { objetivo: objetivo, salt: p.salt, hash: p.hash }, "POST");
+      }
+      if (!r.ok) return msg(st, "❌ " + r.error, "error");
+      if (!objetivo) {
+        alert("✅ " + r.mensaje);
+        clearSession();
+        window.location.href = "index.html";
+        return;
+      }
+      msg(st, "✅ " + r.mensaje, "ok");
+      setTimeout(verUsuarios, 1200);
+    } finally { btn.disabled = false; }
+  }
+
+  async function verUsuarios() {
+    mostrarVista("view-loading");
+    $("loading-text").textContent = "Cargando usuarios...";
+    $("modo-indicador").style.display = "none";
+    const r = await api("listar_usuarios");
+    if (!r.ok) { alert("Error: " + r.error); return iniciarFlujo(getSession()); }
+    usuariosCache = r.usuarios;
+    const cont = $("lista-usuarios");
+    cont.innerHTML = "";
+    const yo = getSession().user;
+    r.usuarios.forEach(x => {
+      const d = document.createElement("div");
+      d.className = "usuario-card" + (x.activo ? "" : " inactivo");
+      d.innerHTML =
+        '<div class="usuario-fila"><b>' + esc(x.usuario) + (x.usuario === yo ? " (tú)" : "") + '</b>' +
+          '<span class="chip-rol">' + esc(NOMBRE_ROL[x.rol] || x.rol) + (x.cedis ? " " + esc(x.cedis) : "") + '</span></div>' +
+        '<div class="usuario-sub">' + esc(x.nombre) + '</div>' +
+        '<div class="usuario-sub">Eventos: ' + esc((x.eventos || []).join(", ") || "—") + '</div>' +
+        '<div class="usuario-sub">Último acceso: ' + esc(x.ultimo_acceso || "nunca") +
+          (x.cambiar_password ? ' · <span class="aviso-temp">contraseña temporal</span>' : '') + (x.activo ? '' : ' · INACTIVO') + '</div>';
+      const acc = document.createElement("div");
+      acc.className = "usuario-acciones";
+      const boton = (txt, fn) => { const b = document.createElement("button"); b.className = "btn-secondary btn-chico"; b.textContent = txt; b.onclick = fn; acc.appendChild(b); };
+      boton("✏️ Editar", () => abrirFormUsuario(x.usuario));
+      boton("🔑 Restablecer", () => abrirPassword(x.usuario, false));
+      if (x.usuario !== yo) boton(x.activo ? "🚫 Desactivar" : "✅ Activar", async () => {
+        if (x.activo && !confirm("¿Desactivar a " + x.usuario + "? No podrá entrar.")) return;
+        const rr = await api("activar_usuario", { objetivo: x.usuario, activo: !x.activo }, "POST");
+        if (!rr.ok) alert("Error: " + rr.error);
+        verUsuarios();
+      });
+      d.appendChild(acc);
+      cont.appendChild(d);
+    });
+    mostrarVista("view-usuarios");
+  }
+
+  function actualizarFormRol() {
+    const rol = $("usuario-form-rol").value;
+    const esCedis = rol === "cedis";
+    $("grupo-usuario-cedis").classList.toggle("hidden", !esCedis);
+    $("grupo-usuario-nombre-login").classList.toggle("hidden", esCedis);
+    $("grupo-usuario-eventos").classList.toggle("hidden", esCedis);
+    const defaults = { planta: ["SALIDA_PLANTA"], aduana: ["ADUANA_ENTRADA", "ADUANA_SALIDA"] };
+    if (!$("usuario-form-modo").dataset.tocoEventos) {
+      document.querySelectorAll(".chk-evento").forEach(c => {
+        c.checked = (defaults[rol] || ["SALIDA_PLANTA", "ADUANA_ENTRADA", "ADUANA_SALIDA", "ENTREGA_CEDIS", "DEVOLUCION"]).includes(c.value);
+      });
+    }
+  }
+
+  function abrirFormUsuario(usuario) {
+    const u = usuario ? usuariosCache.find(x => x.usuario === usuario) : null;
+    $("usuario-form-modo").value = u ? "editar" : "crear";
+    delete $("usuario-form-modo").dataset.tocoEventos;
+    $("usuario-form-titulo").textContent = u ? "✏️ Editar " + u.usuario : "👤 Nuevo usuario";
+    $("usuario-form-usuario").value = u ? u.usuario : "";
+    $("usuario-form-usuario").disabled = !!u;
+    $("usuario-form-nombre").value = u ? u.nombre : "";
+    $("usuario-form-rol").value = u ? u.rol : "planta";
+    $("usuario-form-rol").disabled = !!u && u.usuario === getSession().user;
+    $("usuario-form-cedis").value = u ? u.cedis : "";
+    $("usuario-form-cedis").disabled = !!u;
+    $("grupo-usuario-pass").classList.toggle("hidden", !!u);
+    $("usuario-form-pass1").value = "";
+    $("usuario-form-pass2").value = "";
+    actualizarFormRol();
+    if (u) document.querySelectorAll(".chk-evento").forEach(c => { c.checked = (u.eventos || []).includes(c.value); });
+    document.querySelectorAll(".chk-evento").forEach(c => { c.onchange = () => { $("usuario-form-modo").dataset.tocoEventos = "1"; }; });
+    msg($("usuario-form-status"), "");
+    mostrarVista("view-usuario-form");
+  }
+
+  async function guardarUsuario() {
+    const st = $("usuario-form-status");
+    const modo = $("usuario-form-modo").value;
+    const rol = $("usuario-form-rol").value;
+    const datos = {
+      nombre: $("usuario-form-nombre").value.trim(),
+      nuevo_rol: rol,
+      cedis: $("usuario-form-cedis").value.trim(),
+      eventos: Array.from(document.querySelectorAll(".chk-evento:checked")).map(c => c.value),
+    };
+    if (rol === "cedis" && !/^\d{1,5}$/.test(datos.cedis)) return msg(st, "❌ Escribe el número de CEDIS (ej. 004)", "error");
+    if (rol !== "cedis" && !datos.nombre) return msg(st, "❌ Escribe el nombre", "error");
+    if (rol !== "cedis" && !datos.eventos.length) return msg(st, "❌ Marca al menos un evento", "error");
+    const btn = $("btn-guardar-usuario");
+    btn.disabled = true;
+    try {
+      let r;
+      if (modo === "crear") {
+        datos.nuevo_usuario = $("usuario-form-usuario").value.trim().toLowerCase();
+        if (rol !== "cedis" && !/^[a-z0-9._-]{3,30}$/.test(datos.nuevo_usuario)) return msg(st, "❌ Usuario: mínimo 3 caracteres, sin espacios ni acentos", "error");
+        msg(st, "Protegiendo contraseña...");
+        const p = await prepararPassword($("usuario-form-pass1").value, $("usuario-form-pass2").value);
+        if (p.error) return msg(st, "❌ " + p.error, "error");
+        datos.salt = p.salt; datos.hash = p.hash;
+        r = await api("crear_usuario", datos, "POST");
+      } else {
+        datos.objetivo = $("usuario-form-usuario").value;
+        r = await api("editar_usuario", datos, "POST");
+      }
+      if (!r.ok) return msg(st, "❌ " + r.error, "error");
+      msg(st, "✅ " + r.mensaje, "ok");
+      setTimeout(verUsuarios, 1200);
+    } finally { btn.disabled = false; }
   }
 
   return {
