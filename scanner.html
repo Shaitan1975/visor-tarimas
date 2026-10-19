@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="./icono_192x192.png">
 
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="styles.css?v=23">
+<link rel="stylesheet" href="styles.css?v=24">
 </head>
 <body class="scanner-body" id="scanner-body">
 
@@ -475,6 +475,9 @@ CHILI
       <button class="btn-primary btn-large" onclick="generarAsignacionQR()" id="btn-generar-asignacion" style="flex:1;min-width:200px;">
         🎯 Generar Asignación
       </button>
+      <button class="btn-primary" onclick="etiquetasDesdeAsignacion()" id="btn-etiquetas-app" style="flex:1;min-width:200px;display:none;">
+        🏷️ Etiquetas y pase de salida
+      </button>
       <button class="btn-secondary" onclick="descargarAsignacionCSV()" id="btn-descargar-csv" style="flex:1;min-width:200px;display:none;">
         📥 Descargar CSV
       </button>
@@ -488,7 +491,7 @@ CHILI
 
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="app.js?v=23"></script>
+<script src="app.js?v=24"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     App.initScanner();

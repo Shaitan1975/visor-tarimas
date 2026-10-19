@@ -6,12 +6,13 @@
 // Al publicar cambios: sube el número de CACHE.
 // ═══════════════════════════════════════════════════════════════════
 
-const CACHE = "visor-v23-20261018";
+const CACHE = "visor-v24-20261018";
 const ARCHIVOS = [
   "./",
   "./index.html",
   "./scanner.html",
   "./app.js",
+  "./qrcode.min.js",
   "./styles.css",
   "./manifest.json",
   "./icono_192x192.png"

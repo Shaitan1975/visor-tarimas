@@ -973,6 +973,10 @@ const App = (() => {
       ev.stopPropagation();
       abrirFormularioCancelar(b.dataset.camion, b.dataset.ev, b.dataset.qr);
     }));
+    if (session && ["gerencia", "admin"].includes(session.rol) && data.camion) {
+      contenedor.insertAdjacentHTML("afterbegin", '<button type="button" class="btn-secondary btn-reimprimir">🏷️ Imprimir etiquetas y pase de salida</button>');
+      contenedor.querySelector(".btn-reimprimir").addEventListener("click", () => abrirEtiquetas(data.camion, null));
+    }
     if (session && session.rol === "cedis") {
       contenedor.insertAdjacentHTML("afterbegin", '<p class="aviso-cedis">Solo ves las tarimas que van a tu CEDIS (' + esc(session.cedis) + ').</p>');
     }
@@ -1144,12 +1148,135 @@ const App = (() => {
     } finally { btn.disabled = false; }
   }
 
+
+  // ═════════════════ ETIQUETAS DE TARIMA Y PASE DE SALIDA (v24) ═════════════════
+  const PRODUCTO_PASE = { OR: "CACAHUATE JAPONES ORIGINAL 150 GRS", LIM: "CACAHUATE JAPONES LIMON 150 GRS", CH: "CACAHUATE JAPONES CHILES 150 GRS" };
+
+  function cargarScript(src) {
+    return new Promise((resolve, reject) => {
+      if (document.querySelector("script[data-lib='" + src + "']")) return resolve();
+      const sc = document.createElement("script");
+      sc.src = src; sc.dataset.lib = src;
+      sc.onload = () => resolve();
+      sc.onerror = () => reject(new Error("No se pudo cargar " + src));
+      document.head.appendChild(sc);
+    });
+  }
+
+  // tarimas = null → reimprime lo que ya está en el catálogo
+  async function abrirEtiquetas(camion, tarimas) {
+    // La ventana se abre YA (dentro del clic) para que el celular no la bloquee
+    const w = window.open("", "_blank");
+    if (!w) return alert("Permite las ventanas emergentes de este sitio para imprimir.");
+    w.document.write("<p style='font-family:sans-serif;padding:20px'>Preparando etiquetas de " + esc(camion) + "…</p>");
+    let r;
+    try {
+      await cargarScript("qrcode.min.js");
+      r = await api("etiquetas_camion", { camion: camion, tarimas: tarimas || null }, "POST");
+    } catch (e) { r = { ok: false, error: e.message }; }
+    if (!r || !r.ok) {
+      w.close();
+      if (r && (r.error === "SESION_EXPIRADA" || r.error === "DEBE_CAMBIAR_PASSWORD")) return;
+      return alert("❌ " + ((r && r.error) || "Error al preparar etiquetas"));
+    }
+    w.document.open();
+    w.document.write(htmlEtiquetas_(r));
+    w.document.close();
+  }
+
+  function qrSvg_(texto) {
+    const q = window.qrcode(0, "M");
+    q.addData(texto); q.make();
+    return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+  }
+
+  function htmlEtiquetas_(r) {
+    const hoy = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const etiqueta = t => {
+      const m = t.maestro || {};
+      return '<section class="etq">' +
+        '<div class="top"><div class="qr">' + qrSvg_(t.qr_texto) + '</div>' +
+        '<div class="dc">DC - ' + esc(t.dc) + '</div>' +
+        '<div class="tar">T' + t.num + '/' + t.total + '<small>' + esc(t.sabor) + ' ' + t.idx_sabor + '/' + t.tot_sabor + '</small></div></div>' +
+        '<div class="desc"><b>DESCRIPTION:</b> <span class="d1">' + esc(m.descripcion || ("¡FALTA MAESTRO DC" + t.dc + " " + t.sabor + "!")) + '</span>' +
+        '<div>' + esc(m.descripcion_2 || "") + '</div><div>' + esc(m.descripcion_3 || "") + '</div></div>' +
+        '<table class="dat">' +
+        '<tr><td>' + esc(m.dept || "") + '</td><td><b>PO:</b> ' + esc(t.po) + '</td><td class="ced">' + esc("99" + t.dc) + '</td></tr>' +
+        '<tr><td>' + esc(m["class"] || "") + '</td><td colspan="2"><b>SKU:</b> ' + esc(m.sku || "") + '</td></tr>' +
+        '<tr><td>' + esc(m.sub || "") + '</td><td colspan="2"><b>UPC:</b> ' + esc(m.upc || "") + '</td></tr>' +
+        '<tr><td colspan="3">' + esc(m.sub_class || "") + '</td></tr></table>' +
+        '<div class="ship"><div><b>Location ID:</b> <span class="big">' + esc(m.location_id || ("99" + t.dc)) + '</span></div>' +
+        '<div class="st"><b>Ship To:</b><div>' + esc(m.ship_to_1 || "") + '<br>' + esc(m.ship_to_2 || "") + '<br>' + esc(m.ship_to_3 || "") + '</div></div></div>' +
+        '<div class="pie">' + esc(t.qr_id) + ' · ' + t.lotes.map(l => esc(l.lote) + ' (' + Number(l.pz).toLocaleString("es-MX") + ' pz)').join(", ") + '</div>' +
+        '</section>';
+    };
+
+    // Pase de salida: agrupado por DC + sabor + lote (igual que el de Python)
+    const grupos = {};
+    r.tarimas.forEach(t => t.lotes.forEach(l => {
+      const k = t.dc + "|" + t.sabor + "|" + l.lote;
+      if (!grupos[k]) grupos[k] = { dc: t.dc, sabor: t.sabor, lote: l.lote, pz: 0 };
+      grupos[k].pz += Number(l.pz) || 0;
+    }));
+    const filas = Object.values(grupos).sort((a, b) => (a.dc + a.lote).localeCompare(b.dc + b.lote));
+    const totalPz = filas.reduce((s, f) => s + f.pz, 0);
+    const pase = '<section class="pase"><div class="pase-enc"><b>FECHA: ' + hoy + '</b><b>PASE DE SALIDA · CAMIÓN ' + esc(r.camion) + '</b><b>HOJA 1 DE 1</b></div>' +
+      '<table class="tpase"><thead><tr><th>FECHA</th><th>CLIENTE</th><th>DC</th><th>LOTE PT</th><th>PRODUCTO</th><th>UNIDAD</th><th>CANTIDAD</th></tr></thead><tbody>' +
+      filas.map(f => '<tr><td>' + hoy + '</td><td class="cli">DOLLAR TREE</td><td>' + esc(f.dc) + '</td><td>' + esc(f.lote) + '</td><td>' +
+        esc(PRODUCTO_PASE[f.sabor] || f.sabor) + '</td><td>PZ</td><td>' + f.pz.toLocaleString("es-MX") + '</td></tr>').join("") +
+      '</tbody></table><p class="tot">TARIMAS: ' + r.total + ' · TOTAL DE PIEZAS: ' + totalPz.toLocaleString("es-MX") + '</p>' +
+      '<div class="firmas"><div>ENTREGA</div><div>RECIBE</div><div>VALIDA</div></div>' +
+      '<div id="lic" class="lic hidden"><p><b>LICENCIA DEL CHOFER</b></p><img id="lic-img" alt=""></div></section>';
+
+    const avisos = (r.avisos || []).map(a => '<p class="aviso">⚠️ ' + esc(a) + '</p>').join("");
+    return "<!doctype html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" +
+      "<title>Etiquetas " + esc(r.camion) + "</title><style>" + CSS_ETIQUETAS_ + "</style></head><body>" +
+      "<div class='barra'><b>🏷️ " + esc(r.camion) + " · " + r.total + " tarima(s)" + (r.ya_existian ? " · reimpresión" : "") + "</b>" +
+      "<label>Cliente <input id='cli' value='DOLLAR TREE'></label>" +
+      "<label>Licencia del chofer <input id='licf' type='file' accept='image/*'></label>" +
+      "<label><input id='conpase' type='checkbox' checked> Incluir pase de salida</label>" +
+      "<button onclick='window.print()'>🖨️ Imprimir / Guardar PDF</button>" + avisos +
+      "<p class='nota'>En el diálogo de impresión: tamaño Carta, márgenes predeterminados, sin encabezados.</p></div>" +
+      r.tarimas.map(etiqueta).join("") + pase +
+      "<script>" +
+      "document.getElementById('cli').oninput=function(){var v=this.value.toUpperCase();document.querySelectorAll('.cli').forEach(function(c){c.textContent=v;});};" +
+      "document.getElementById('conpase').onchange=function(){document.querySelector('.pase').classList.toggle('hidden',!this.checked);};" +
+      "document.getElementById('licf').onchange=function(){var f=this.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){document.getElementById('lic-img').src=rd.result;document.getElementById('lic').classList.remove('hidden');};rd.readAsDataURL(f);};" +
+      "<\/script></body></html>";
+  }
+
+  const CSS_ETIQUETAS_ = [
+    "*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#e5e7eb;color:#000}",
+    ".hidden{display:none!important}",
+    ".barra{position:sticky;top:0;background:#1e3a5f;color:#fff;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;z-index:5}",
+    ".barra input{padding:6px;border-radius:6px;border:0}.barra button{background:#22c55e;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:bold;font-size:15px}",
+    ".aviso{width:100%;margin:4px 0;background:#fef3c7;color:#92400e;padding:6px 10px;border-radius:6px}.nota{width:100%;margin:0;font-size:12px;opacity:.8}",
+    "@page etq{size:letter landscape;margin:0.35in}@page pase{size:letter portrait;margin:0.4in}",
+    ".etq{page:etq;background:#fff;width:10.3in;height:7.75in;margin:14px auto;padding:0.15in 0.25in;display:flex;flex-direction:column;gap:0.08in;overflow:hidden;break-after:page}",
+    ".top{display:flex;align-items:center;gap:0.25in;height:2.3in}.qr{width:2.3in;height:2.3in;flex:none}.qr svg{width:100%;height:100%}",
+    ".dc{flex:1;text-align:center;font-size:72pt;font-weight:900;letter-spacing:2px}",
+    ".tar{flex:none;border:4px solid #000;border-radius:10px;padding:6px 14px;text-align:center;font-size:44pt;font-weight:900;line-height:1}.tar small{display:block;font-size:20pt;margin-top:4px}",
+    ".desc{font-size:17pt;line-height:1.3}.desc .d1{font-size:25pt;font-weight:900}",
+    ".dat{width:100%;border-collapse:collapse;font-size:18pt;font-weight:bold}.dat td{padding:5px 4px;vertical-align:top}.dat td:first-child{width:48%}.ced{font-size:28pt;font-weight:900;text-align:right}",
+    ".ship{display:flex;gap:0.3in;align-items:flex-start;font-size:19pt;font-weight:bold;margin-top:auto}.ship .big{font-size:26pt;font-weight:900}.st{display:flex;gap:10px}",
+    ".pie{font-size:9pt;color:#444;border-top:1px solid #999;padding-top:3px}",
+    ".pase{page:pase;background:#fff;width:7.7in;margin:14px auto;padding:0.2in;font-size:10pt}",
+    ".pase-enc{display:flex;justify-content:space-between;margin-bottom:10px;font-size:10pt}",
+    ".tpase{width:100%;border-collapse:collapse;font-size:9pt}.tpase th{background:#666;color:#fff}.tpase th,.tpase td{border:1px solid #888;padding:5px 3px;text-align:center}",
+    ".tot{text-align:right;font-weight:bold;font-size:11pt}",
+    ".firmas{display:flex;justify-content:space-around;margin-top:0.7in;font-size:9pt;text-align:center}.firmas div{border-top:1px solid #000;width:2.1in;padding-top:4px}",
+    ".lic{text-align:center;margin-top:0.4in}.lic img{max-width:3.35in;max-height:2.2in}",
+    "@media print{body{background:#fff}.barra{display:none}.etq,.pase{margin:0;box-shadow:none}.etq{width:auto;height:7.7in}}",
+    "@media screen and (max-width:800px){.etq{transform-origin:top left;zoom:0.36}.pase{zoom:0.48}}",
+  ].join("\n");
+
   return {
     initLogin,
     initScanner,
     abrirFormularioCancelar,
     jsonp,
     getSession,
+    abrirEtiquetas,
   };
 })();
 
@@ -2346,6 +2473,7 @@ function mostrarGenerarQRs() {
   document.getElementById("qr-status").textContent = "";
   document.getElementById("qr-status").className = "send-status";
   document.getElementById("btn-descargar-csv").style.display = "none";
+  document.getElementById("btn-etiquetas-app").style.display = "none";
   asignacionGenerada = null;
 
   // 🔥 Cargar camiones primero, luego los CEDIS
@@ -2594,6 +2722,7 @@ async function generarAsignacionQR() {
     }
 
     document.getElementById("btn-descargar-csv").style.display = "block";
+    document.getElementById("btn-etiquetas-app").style.display = nTarimas ? "block" : "none";
   } catch (e) {
     statusEl.textContent = "❌ " + e.message;
     statusEl.className = "send-status error";
@@ -2915,6 +3044,26 @@ window.mostrarGenerarQRs = mostrarGenerarQRs;
 window.cargarCedisPendientes = cargarCedisPendientes;
 window.generarAsignacionQR = generarAsignacionQR;
 window.descargarAsignacionCSV = descargarAsignacionCSV;
+
+function etiquetasDesdeAsignacion() {
+  if (!asignacionGenerada || !asignacionGenerada.tarimas || !asignacionGenerada.tarimas.length) {
+    alert("Primero genera la asignación");
+    return;
+  }
+  const camiones = [...new Set(asignacionGenerada.tarimas.map(t => String(t.camion || "").trim()).filter(Boolean))];
+  if (!camiones.length) { alert("Las tarimas no tienen camión asignado"); return; }
+  let camion = camiones[0];
+  if (camiones.length > 1) {
+    const r = prompt("¿De qué camión imprimes etiquetas?\n\n" + camiones.map((c, i) => (i + 1) + ". " + c).join("\n"), "1");
+    if (r === null) return;
+    camion = camiones[(parseInt(r, 10) || 0) - 1];
+    if (!camion) { alert("Número no válido"); return; }
+  }
+  const tarimas = asignacionGenerada.tarimas.filter(t => String(t.camion || "").trim() === camion);
+  if (!confirm("Se registrarán " + tarimas.length + " tarima(s) del camión " + camion + " y se abrirán sus etiquetas.\n\n¿Continuar?")) return;
+  App.abrirEtiquetas(camion, tarimas);
+}
+window.etiquetasDesdeAsignacion = etiquetasDesdeAsignacion;
 
 // ═══════════════════════════════════════════════════════════════════
 // ALIAS DE COMPATIBILIDAD
