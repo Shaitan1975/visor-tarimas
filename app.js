@@ -504,6 +504,11 @@ const App = (() => {
             mostrarVista("view-ready");
           }, 300);
           return;
+        }
+        if (resp.fuera_de_orden || resp.no_catalogo) {
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+          setTimeout(() => { alert("⛔ " + resp.error); mostrarVista("view-ready"); }, 300);
+          return;
         } else {
           throw new Error(resp.error || "Error desconocido");
         }
@@ -511,6 +516,10 @@ const App = (() => {
 
       if (payload.camion) setCamionActual(payload.camion);
       setTimeout(() => mostrarExito(datos, session), 100);
+      if (resp.avisos_almacen && resp.avisos_almacen.length) {
+        setTimeout(() => alert("✅ Tarima registrada, pero Almacén NO recibió:\n\n" +
+          resp.avisos_almacen.join("\n") + "\n\nAvisa al administrador para reintentar."), 600);
+      }
       actualizarProgresoPantalla();
 
     } catch (e) {
@@ -723,7 +732,8 @@ const App = (() => {
         }
         return;
       }
-      statusEl.textContent = "✅ Evento registrado";
+      statusEl.textContent = "✅ Evento registrado" +
+        (resp.avisos_almacen && resp.avisos_almacen.length ? " — ⚠️ Almacén no recibió: " + resp.avisos_almacen.join("; ") : "");
       statusEl.className = "send-status ok";
       if (camion === getCamionActual()) setCamionActual(camion);
       document.getElementById("btn-registrar-otro").classList.remove("hidden");
