@@ -1209,7 +1209,7 @@ const App = (() => {
         '<div class="desc"><b>DESCRIPTION:</b> <span class="d1">' + esc(m.descripcion || ("¡FALTA MAESTRO DC" + t.dc + " " + t.sabor + "!")) + '</span>' +
         '<div>' + esc(m.descripcion_2 || "") + '</div><div>' + esc(m.descripcion_3 || "") + '</div></div>' +
         '<table class="dat">' +
-        '<tr><td>' + esc(m.dept || "") + '</td><td><b>PO:</b> ' + esc(t.po) + '</td><td class="ced">' + esc("99" + t.dc) + '</td></tr>' +
+        '<tr><td>' + esc(m.dept || "") + '</td><td colspan="2"><b>PO:</b> <span class="po">' + esc(t.po) + " " + esc("99" + t.dc) + '</span></td></tr>' +
         '<tr><td>' + esc(m["class"] || "") + '</td><td colspan="2"><b>SKU:</b> ' + esc(m.sku || "") + '</td></tr>' +
         '<tr><td>' + esc(m.sub || "") + '</td><td colspan="2"><b>UPC:</b> ' + esc(m.upc || "") + '</td></tr>' +
         '<tr><td colspan="3">' + esc(m.sub_class || "") + '</td></tr></table>' +
@@ -1279,7 +1279,7 @@ const App = (() => {
     ".dc{flex:1;text-align:center;font-size:72pt;font-weight:900;letter-spacing:2px}",
     ".tar{flex:none;border:4px solid #000;border-radius:10px;padding:6px 14px;text-align:center;font-size:44pt;font-weight:900;line-height:1}.tar small{display:block;font-size:20pt;margin-top:4px}",
     ".desc{font-size:17pt;line-height:1.3}.desc .d1{font-size:25pt;font-weight:900}",
-    ".dat{width:100%;border-collapse:collapse;font-size:18pt;font-weight:bold}.dat td{padding:5px 4px;vertical-align:top}.dat td:first-child{width:48%}.ced{font-size:28pt;font-weight:900;text-align:right}",
+    ".dat{width:100%;border-collapse:collapse;font-size:18pt;font-weight:bold}.dat td{padding:5px 4px;vertical-align:top}.dat td:first-child{width:48%}.po{font-size:22pt;font-weight:900;white-space:nowrap}",
     ".ship{display:flex;gap:0.3in;align-items:flex-start;font-size:19pt;font-weight:bold;margin-top:auto}.ship .big{font-size:26pt;font-weight:900}.st{display:flex;gap:10px}",
     ".pie{font-size:9pt;color:#444;border-top:1px solid #999;padding-top:3px}",
     ".pase{page:pase;background:#fff;width:7.7in;margin:14px auto;padding:0.2in;font-size:10pt}",
