@@ -1169,10 +1169,13 @@ const App = (() => {
     const w = window.open("", "_blank");
     if (!w) return alert("Permite las ventanas emergentes de este sitio para imprimir.");
     w.document.write("<p style='font-family:sans-serif;padding:20px'>Preparando etiquetas de " + esc(camion) + "…</p>");
-    let r;
+    let r, lic = null;
     try {
       await cargarScript("qrcode.min.js");
-      r = await api("etiquetas_camion", { camion: camion, tarimas: tarimas || null }, "POST");
+      [r, lic] = await Promise.all([
+        api("etiquetas_camion", { camion: camion, tarimas: tarimas || null }, "POST"),
+        api("obtener_licencia", { camion: camion }).catch(() => null),
+      ]);
     } catch (e) { r = { ok: false, error: e.message }; }
     if (!r || !r.ok) {
       w.close();
@@ -1180,7 +1183,7 @@ const App = (() => {
       return alert("❌ " + ((r && r.error) || "Error al preparar etiquetas"));
     }
     w.document.open();
-    w.document.write(htmlEtiquetas_(r));
+    w.document.write(htmlEtiquetas_(r, lic && lic.ok && lic.encontrada ? lic : null));
     w.document.close();
   }
 
@@ -1190,7 +1193,12 @@ const App = (() => {
     return q.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
   }
 
-  function htmlEtiquetas_(r) {
+  // La hoja de etiquetas (ventana aparte) llama a esto para guardar la licencia en Drive
+  async function guardarLicencia(camion, chofer, dataUrl) {
+    return api("guardar_licencia", { camion: camion, chofer: chofer || "", data_url: dataUrl }, "POST");
+  }
+
+  function htmlEtiquetas_(r, lic) {
     const hoy = new Date().toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
     const etiqueta = t => {
       const m = t.maestro || {};
@@ -1226,14 +1234,17 @@ const App = (() => {
         esc(PRODUCTO_PASE[f.sabor] || f.sabor) + '</td><td>PZ</td><td>' + f.pz.toLocaleString("es-MX") + '</td></tr>').join("") +
       '</tbody></table><p class="tot">TARIMAS: ' + r.total + ' · TOTAL DE PIEZAS: ' + totalPz.toLocaleString("es-MX") + '</p>' +
       '<div class="firmas"><div>ENTREGA</div><div>RECIBE</div><div>VALIDA</div></div>' +
-      '<div id="lic" class="lic hidden"><p><b>LICENCIA DEL CHOFER</b></p><img id="lic-img" alt=""></div></section>';
+      '<div id="lic" class="lic' + (lic ? '' : ' hidden') + '"><p><b>LICENCIA DEL CHOFER</b><span id="lic-chofer-txt">' +
+      (lic && lic.chofer ? ' · ' + esc(lic.chofer) : '') + '</span></p><img id="lic-img" alt="" src="' + (lic ? lic.data_url : '') + '"></div></section>';
 
     const avisos = (r.avisos || []).map(a => '<p class="aviso">⚠️ ' + esc(a) + '</p>').join("");
     return "<!doctype html><html lang='es'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>" +
       "<title>Etiquetas " + esc(r.camion) + "</title><style>" + CSS_ETIQUETAS_ + "</style></head><body>" +
       "<div class='barra'><b>🏷️ " + esc(r.camion) + " · " + r.total + " tarima(s)" + (r.ya_existian ? " · reimpresión" : "") + "</b>" +
       "<label>Cliente <input id='cli' value='DOLLAR TREE'></label>" +
+      "<label>Chofer <input id='chofer' placeholder='(opcional)' value='" + esc(lic && lic.chofer || "") + "'></label>" +
       "<label>Licencia del chofer <input id='licf' type='file' accept='image/*'></label>" +
+      "<span id='lic-estado' class='lic-estado'>" + (lic ? "🪪 Licencia guardada del camión (" + esc(lic.actualizada) + ")" : "🪪 Sin licencia guardada para este camión") + "</span>" +
       "<label><input id='conpase' type='checkbox' checked> Incluir pase de salida</label>" +
       "<button onclick='window.print()'>🖨️ Imprimir / Guardar PDF</button>" + avisos +
       "<p class='nota'>En el diálogo de impresión: tamaño Carta, márgenes predeterminados, sin encabezados.</p></div>" +
@@ -1241,7 +1252,17 @@ const App = (() => {
       "<script>" +
       "document.getElementById('cli').oninput=function(){var v=this.value.toUpperCase();document.querySelectorAll('.cli').forEach(function(c){c.textContent=v;});};" +
       "document.getElementById('conpase').onchange=function(){document.querySelector('.pase').classList.toggle('hidden',!this.checked);};" +
-      "document.getElementById('licf').onchange=function(){var f=this.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){document.getElementById('lic-img').src=rd.result;document.getElementById('lic').classList.remove('hidden');};rd.readAsDataURL(f);};" +
+      "var CAMION=" + JSON.stringify(r.camion) + ";" +
+      "var est=document.getElementById('lic-estado');" +
+      "document.getElementById('chofer').oninput=function(){document.getElementById('lic-chofer-txt').textContent=this.value?' · '+this.value:'';};" +
+      // Se reduce la foto (máx. 1400 px, JPG) antes de mostrarla y guardarla en Drive
+      "document.getElementById('licf').onchange=function(){var f=this.files[0];if(!f)return;var rd=new FileReader();rd.onload=function(){var im=new Image();im.onload=function(){" +
+        "var k=Math.min(1,1400/Math.max(im.width,im.height));var c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);" +
+        "var g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);var url=c.toDataURL('image/jpeg',0.85);" +
+        "document.getElementById('lic-img').src=url;document.getElementById('lic').classList.remove('hidden');est.textContent='⏳ Guardando licencia...';" +
+        "try{window.opener.App.guardarLicencia(CAMION,document.getElementById('chofer').value,url).then(function(x){est.textContent=x&&x.ok?'✅ Licencia guardada para '+CAMION:'⚠️ No se guardó: '+((x&&x.error)||'error');});}" +
+        "catch(e){est.textContent='⚠️ No se guardó (cierra y vuelve a abrir desde la app)';}" +
+      "};im.src=rd.result;};rd.readAsDataURL(f);};" +
       "<\/script></body></html>";
   }
 
@@ -1249,6 +1270,7 @@ const App = (() => {
     "*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#e5e7eb;color:#000}",
     ".hidden{display:none!important}",
     ".barra{position:sticky;top:0;background:#1e3a5f;color:#fff;padding:10px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;z-index:5}",
+    ".lic-estado{font-size:13px;background:rgba(255,255,255,.15);padding:4px 8px;border-radius:6px}",
     ".barra input{padding:6px;border-radius:6px;border:0}.barra button{background:#22c55e;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:bold;font-size:15px}",
     ".aviso{width:100%;margin:4px 0;background:#fef3c7;color:#92400e;padding:6px 10px;border-radius:6px}.nota{width:100%;margin:0;font-size:12px;opacity:.8}",
     "@page etq{size:letter landscape;margin:0.35in}@page pase{size:letter portrait;margin:0.4in}",
@@ -1277,8 +1299,10 @@ const App = (() => {
     jsonp,
     getSession,
     abrirEtiquetas,
+    guardarLicencia,
   };
 })();
+window.App = App;   // la hoja de etiquetas (ventana aparte) lo usa para guardar la licencia
 
 // ═══════════════════════════════════════════════════════════════════
 // PEDIDOS - Frontend
