@@ -1265,7 +1265,7 @@ const App = (() => {
     ".tpase{width:100%;border-collapse:collapse;font-size:9pt}.tpase th{background:#666;color:#fff}.tpase th,.tpase td{border:1px solid #888;padding:5px 3px;text-align:center}",
     ".tot{text-align:right;font-weight:bold;font-size:11pt}",
     ".firmas{display:flex;justify-content:space-around;margin-top:0.7in;font-size:9pt;text-align:center}.firmas div{border-top:1px solid #000;width:2.1in;padding-top:4px}",
-    ".lic{text-align:center;margin-top:0.4in}.lic img{max-width:3.35in;max-height:2.2in}",
+    ".lic{text-align:center;margin-top:0.4in}.lic img{width:85mm;height:55mm;object-fit:contain;border:1px solid #999}",
     "@media print{body{background:#fff}.barra{display:none}.etq,.pase{margin:0;box-shadow:none}.etq{width:auto;height:7.7in}}",
     "@media screen and (max-width:800px){.etq{transform-origin:top left;zoom:0.36}.pase{zoom:0.48}}",
   ].join("\n");
