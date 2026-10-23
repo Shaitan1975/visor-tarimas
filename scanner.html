@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="./icono_192x192.png">
 
 <link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="styles.css?v=25">
+<link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body class="scanner-body" id="scanner-body">
 
@@ -464,6 +464,15 @@ CHILI
 
     <div id="qr-resumen" style="margin:15px 0;"></div>
 
+    <details id="qr-manual" class="qr-manual">
+      <summary>✍️ Lotes sin ingreso en almacén (captura manual) <span id="qr-manual-cuenta"></span></summary>
+      <p class="qr-manual-ayuda">Úsalo solo cuando el producto ya está físicamente pero Almacén aún no le da entrada.
+        Estos lotes se usan <b>después</b> de los del sistema. Al dar la salida, Almacén los deja en negativo con alerta
+        hasta que se capture su entrada con el <b>mismo lote</b>.</p>
+      <div id="qr-manual-filas"></div>
+      <button type="button" class="btn-secondary" onclick="agregarLoteManualQR()">➕ Agregar lote</button>
+    </details>
+
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:15px;">
       <button class="btn-primary btn-large" onclick="generarAsignacionQR()" id="btn-generar-asignacion" style="flex:1;min-width:200px;">
         🎯 Generar Asignación
@@ -484,7 +493,7 @@ CHILI
 
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="app.js?v=25"></script>
+<script src="app.js?v=27"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     App.initScanner();

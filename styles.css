@@ -1302,3 +1302,12 @@ details summary {
 .tile-verde { background: #F0FDF4; border-color: #BBF7D0; color: #166534; }
 .tile-morado { background: #F5F3FF; border-color: #DDD6FE; color: #5B21B6; }
 .tile.hidden { display: none; }
+
+/* v27 — Lotes manuales en Generar QRs */
+.qr-manual { border: 1px dashed #F59E0B; background: #FFFBEB; border-radius: 10px; padding: 10px 12px; margin: 10px 0 15px; }
+.qr-manual summary { cursor: pointer; font-weight: 700; color: #92400E; font-size: 14px; }
+.qr-manual-ayuda { font-size: 12px; color: #78350F; margin: 8px 0; }
+.qr-manual-fila { display: grid; grid-template-columns: 1.3fr 1.3fr 0.8fr auto; gap: 6px; margin-bottom: 6px; }
+.qr-manual-fila select, .qr-manual-fila input { padding: 8px; border: 1px solid #FCD34D; border-radius: 8px; font: inherit; font-size: 13px; min-width: 0; background: #fff; }
+.qr-manual-fila .qm-quitar { border: 0; background: #FEE2E2; color: #B91C1C; border-radius: 8px; padding: 0 10px; cursor: pointer; }
+@media (max-width: 480px) { .qr-manual-fila { grid-template-columns: 1.4fr 1fr auto; padding-bottom: 6px; border-bottom: 1px solid #FDE68A; } .qr-manual-fila .qm-pt { grid-column: 1 / -1; } }

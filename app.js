@@ -1598,7 +1598,7 @@ function renderizarDetallePedido(p) {
                 <th style="padding:6px;text-align:right;">Pedidas</th>
                 <th style="padding:6px;text-align:right;">Surtidas</th>
                 <th style="padding:6px;text-align:right;">Stock PT</th>
-                <th style="padding:6px;text-align:right;">Pendientes</th>
+                <th style="padding:6px;text-align:right;">Por producir</th>
               </tr>
             </thead>
             <tbody>
@@ -1628,7 +1628,8 @@ function renderizarDetallePedido(p) {
       <p><b>SKUs:</b> ${p.skus.length}</p>
       <p><b>PZ pedidas:</b> ${formatearNumero(p.pz_pedidas_total || 0, 0)} · 
          <b>Surtidas:</b> ${formatearNumero(p.pz_surtidas_total || 0, 0)} · 
-         <b>Pendientes:</b> <span style="color:#B45309;font-weight:700;">${formatearNumero(p.pz_pendientes_total || 0, 0)}</span></p>
+         <b>Pendientes de salir:</b> <span style="color:#B45309;font-weight:700;">${formatearNumero(p.pz_pendientes_total || 0, 0)}</span>
+         ${(p.pz_en_stock_total || 0) > 0 ? `<span style="color:#1F7A1F;"> (${formatearNumero(p.pz_en_stock_total, 0)} ya en almacén)</span>` : ""}</p>
       ${p.fecha_entrega ? `<p><b>Fecha entrega:</b> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
       <p><b>Capturado:</b> ${formatearFecha(p.fecha_captura)} por ${p.usuario}</p>
     </div>
@@ -1985,7 +1986,7 @@ function imprimirPedido() {
       <p><strong>Estado:</strong> ${p.estado_pedido || "PENDIENTE"}</p>
       <p><strong>PZ pedidas:</strong> ${formatearNumero(p.pz_pedidas_total, 0)} · 
          <strong>Surtidas:</strong> ${formatearNumero(p.pz_surtidas_total, 0)} · 
-         <strong>Pendientes:</strong> ${formatearNumero(p.pz_pendientes_total, 0)}</p>
+         <strong>Pendientes de salir:</strong> ${formatearNumero(p.pz_pendientes_total, 0)}</p>
       ${p.fecha_entrega ? `<p><strong>Fecha entrega:</strong> ${formatearFecha(p.fecha_entrega)}</p>` : ""}
       <p><strong>Capturado:</strong> ${formatearFecha(p.fecha_captura)} por ${p.usuario || "-"}</p>
     </div>
@@ -2008,7 +2009,7 @@ function imprimirPedido() {
         <th>Pedidas</th>
         <th>Surtidas</th>
         <th>Stock PT</th>
-        <th>Pendientes</th>
+        <th>Por producir</th>
       </tr>
     </thead>
     <tbody>
@@ -2086,7 +2087,7 @@ async function imprimirConsolidado() {
 
     const HEAD_PT = `<thead><tr>
       <th>Código OAR</th><th>Descripción</th><th>Pedidas</th>
-      <th>Surtidas</th><th>Stock PT</th><th>Pendientes</th>
+      <th>Surtidas</th><th>Stock PT</th><th>Por producir</th>
     </tr></thead>`;
 
     const HEAD_INS = `<thead><tr>
@@ -2696,9 +2697,17 @@ async function generarAsignacionQR() {
   statusEl.textContent = "⏳ Calculando asignación FIFO...";
   statusEl.className = "send-status";
 
+  const manuales = leerLotesManualesQR();
+  if (manuales.error) {
+    statusEl.textContent = "❌ " + manuales.error;
+    statusEl.className = "send-status error";
+    return;
+  }
+
   const session = getSessionGlobal();
   const body = {
     cedis_seleccionados: seleccionados,
+    lotes_manuales: manuales.lotes,
     usuario: session ? session.user : "sistema",
     rol: session ? session.rol : "admin",
   };
@@ -2871,7 +2880,7 @@ function renderizarAsignacion(resp) {
 
     tarimas.forEach((t, i) => {
       const lotesTxt = (t.lotes || []).map(l =>
-        `${l.lote}<br><span style="color:#718096;font-size:10px;">${l.pz} PZ</span>`
+        `${l.manual ? '<span title="Lote sin ingreso en almacén" style="color:#B45309;font-weight:700;">✍️ ' + l.lote + '</span>' : l.lote}<br><span style="color:#718096;font-size:10px;">${l.pz} PZ</span>`
       ).join("<br>");
       const totalPZ = (t.lotes || []).reduce((s, l) => s + (l.pz || 0), 0);
       const parcial = totalPZ < 5200;
@@ -3044,6 +3053,59 @@ window.mostrarGenerarQRs = mostrarGenerarQRs;
 window.cargarCedisPendientes = cargarCedisPendientes;
 window.generarAsignacionQR = generarAsignacionQR;
 window.descargarAsignacionCSV = descargarAsignacionCSV;
+
+// ─── Lotes manuales (producto sin ingreso en almacén) ───
+const PREFIJO_LOTE_PT = { "MKN 150": "LMK", "MKL 150": "LML", "MKC 150": "LMC" };
+const NOMBRE_PT_QR = { "MKN 150": "Original", "MKL 150": "Limón", "MKC 150": "Chiles" };
+
+function agregarLoteManualQR(pt, lote, pz) {
+  const cont = document.getElementById("qr-manual-filas");
+  const fila = document.createElement("div");
+  fila.className = "qr-manual-fila";
+  fila.innerHTML =
+    '<select class="qm-pt">' + Object.keys(PREFIJO_LOTE_PT).map(c =>
+      '<option value="' + c + '">' + NOMBRE_PT_QR[c] + ' (' + c + ')</option>').join("") + '</select>' +
+    '<input class="qm-lote" placeholder="Lote (ej. LMKSJ-3)" autocapitalize="characters">' +
+    '<input class="qm-pz" type="number" min="1" step="1" placeholder="Piezas">' +
+    '<button type="button" class="qm-quitar" title="Quitar">✖</button>';
+  if (pt) fila.querySelector(".qm-pt").value = pt;
+  if (lote) fila.querySelector(".qm-lote").value = lote;
+  if (pz) fila.querySelector(".qm-pz").value = pz;
+  const pref = () => {
+    const inp = fila.querySelector(".qm-lote");
+    if (!inp.value.trim()) inp.placeholder = "Lote (ej. " + PREFIJO_LOTE_PT[fila.querySelector(".qm-pt").value] + "SJ-3)";
+  };
+  fila.querySelector(".qm-pt").addEventListener("change", pref);
+  fila.querySelector(".qm-quitar").addEventListener("click", () => { fila.remove(); contarLotesManualesQR(); });
+  fila.querySelectorAll("input,select").forEach(e => e.addEventListener("input", contarLotesManualesQR));
+  cont.appendChild(fila);
+  pref(); contarLotesManualesQR();
+  document.getElementById("qr-manual").open = true;
+}
+
+function leerLotesManualesQR() {
+  const lotes = [];
+  for (const f of document.querySelectorAll("#qr-manual-filas .qr-manual-fila")) {
+    const pt = f.querySelector(".qm-pt").value;
+    const lote = f.querySelector(".qm-lote").value.trim().toUpperCase().replace(/\s+/g, "");
+    const pz = Math.round(Number(f.querySelector(".qm-pz").value) || 0);
+    if (!lote && !pz) continue;
+    if (!lote) return { error: "Falta el lote en una fila manual (" + NOMBRE_PT_QR[pt] + ")" };
+    if (pz <= 0) return { error: "Escribe las piezas del lote " + lote };
+    if (lote.indexOf(PREFIJO_LOTE_PT[pt]) !== 0) return { error: "El lote " + lote + " no es de " + NOMBRE_PT_QR[pt] + ": debe empezar con " + PREFIJO_LOTE_PT[pt] };
+    lotes.push({ pt_codigo: pt, lote: lote, pz: pz });
+  }
+  return { lotes: lotes };
+}
+
+function contarLotesManualesQR() {
+  const r = leerLotesManualesQR();
+  const el = document.getElementById("qr-manual-cuenta");
+  if (!el) return;
+  const n = (r.lotes || []).length, pz = (r.lotes || []).reduce((s, l) => s + l.pz, 0);
+  el.textContent = n ? "· " + n + " lote(s), " + formatearNumero(pz, 0) + " PZ" : "";
+}
+window.agregarLoteManualQR = agregarLoteManualQR;
 
 function etiquetasDesdeAsignacion() {
   if (!asignacionGenerada || !asignacionGenerada.tarimas || !asignacionGenerada.tarimas.length) {
