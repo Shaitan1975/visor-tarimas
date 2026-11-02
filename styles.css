@@ -1311,3 +1311,11 @@ details summary {
 .qr-manual-fila select, .qr-manual-fila input { padding: 8px; border: 1px solid #FCD34D; border-radius: 8px; font: inherit; font-size: 13px; min-width: 0; background: #fff; }
 .qr-manual-fila .qm-quitar { border: 0; background: #FEE2E2; color: #B91C1C; border-radius: 8px; padding: 0 10px; cursor: pointer; }
 @media (max-width: 480px) { .qr-manual-fila { grid-template-columns: 1.4fr 1fr auto; padding-bottom: 6px; border-bottom: 1px solid #FDE68A; } .qr-manual-fila .qm-pt { grid-column: 1 / -1; } }
+
+.btn-anular { margin-top: 8px; width: 100%; }
+.anular-caja { background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 12px; margin: 10px 0; }
+.anular-caja h4 { margin: 0 0 6px; color: #991B1B; }
+.anular-aviso { font-size: 13px; color: #7F1D1D; margin: 4px 0 10px; }
+.anular-fila { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid #FEE2E2; font-size: 14px; cursor: pointer; }
+.anular-fila input { width: auto; margin-top: 3px; }
+.anular-caja input[type=text] { width: 100%; box-sizing: border-box; margin: 4px 0 6px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 15px; }

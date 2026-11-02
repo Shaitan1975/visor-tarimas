@@ -911,6 +911,37 @@ const App = (() => {
     }
   }
 
+  // Tarimas con QR generado que no se embarcaron: se quitan del camión (con motivo)
+  async function abrirAnular(camion) {
+    const panel = document.getElementById("panel-anular");
+    panel.innerHTML = '<p class="texto-faltantes">Cargando tarimas sin escanear...</p>';
+    const r = await api("tarimas_sin_eventos", { camion: camion });
+    if (!r.ok) { panel.innerHTML = '<p class="send-status error">❌ ' + esc(r.error) + '</p>'; return; }
+    if (!r.tarimas.length) { panel.innerHTML = '<p class="anular-aviso">Todas las tarimas de este camión ya tienen algún evento. Si una no salió, primero cancela su evento ❌.</p>'; return; }
+    panel.innerHTML = '<div class="anular-caja"><h4>🚫 Anular tarimas que no salieron</h4>' +
+      '<p class="anular-aviso">Se quitan de este camión y el pedido sigue pendiente por ellas. Retira y destruye sus etiquetas; cuando salgan, genera sus QR de nuevo.</p>' +
+      '<label class="anular-fila"><input type="checkbox" id="anular-todas"> <b>Seleccionar todas (' + r.tarimas.length + ')</b></label>' +
+      r.tarimas.map(t => '<label class="anular-fila"><input type="checkbox" class="anular-chk" value="' + esc(t.qr_id) + '"> <span><b>' + esc(t.qr_id) + '</b><br>' +
+        '<small>CEDIS ' + esc(t.cedis) + ' · ' + esc(t.sabor) + ' · ' + Number(t.piezas || 0).toLocaleString("es-MX") + ' pz · ' + esc(t.lotes.join(", ")) + '</small></span></label>').join("") +
+      '<label for="anular-motivo">Motivo *</label><input type="text" id="anular-motivo" placeholder="Ej. No salió: CEDIS reprogramó la cita">' +
+      '<p id="anular-status" class="send-status"></p>' +
+      '<button type="button" id="btn-anular-ok" class="btn-primary" style="background:#DC2626;border-color:#DC2626;">🚫 Anular seleccionadas</button></div>';
+    document.getElementById("anular-todas").onchange = e => panel.querySelectorAll(".anular-chk").forEach(c => { c.checked = e.target.checked; });
+    document.getElementById("btn-anular-ok").onclick = async () => {
+      const st = document.getElementById("anular-status");
+      const qrs = Array.from(panel.querySelectorAll(".anular-chk:checked")).map(c => c.value);
+      const motivo = document.getElementById("anular-motivo").value.trim();
+      if (!qrs.length) { st.textContent = "❌ Elige las tarimas que no salieron"; st.className = "send-status error"; return; }
+      if (motivo.length < 5) { st.textContent = "❌ Escribe el motivo"; st.className = "send-status error"; return; }
+      if (!confirm("¿Anular " + qrs.length + " tarima(s) del camión " + camion + "?\n\n" + qrs.join("\n") + "\n\nSe quitan del camión y del pase de salida.")) return;
+      st.textContent = "Anulando..."; st.className = "send-status";
+      const res = await api("anular_tarimas", { camion: camion, qr_ids: qrs, motivo: motivo }, "POST");
+      if (!res.ok) { st.textContent = "❌ " + res.error; st.className = "send-status error"; return; }
+      alert("✅ " + res.mensaje);
+      verDetalleCamion(camion);
+    };
+  }
+
   function mostrarDetalleCamion(data) {
     document.getElementById("detalle-titulo").textContent = "🚚 " + data.camion;
     const contenedor = document.getElementById("detalle-camion");
@@ -976,6 +1007,9 @@ const App = (() => {
     if (session && ["gerencia", "admin"].includes(session.rol) && data.camion) {
       contenedor.insertAdjacentHTML("afterbegin", '<button type="button" class="btn-secondary btn-reimprimir">🏷️ Imprimir etiquetas y pase de salida</button>');
       contenedor.querySelector(".btn-reimprimir").addEventListener("click", () => abrirEtiquetas(data.camion, null));
+      contenedor.querySelector(".btn-reimprimir").insertAdjacentHTML("afterend",
+        '<button type="button" class="btn-secondary btn-anular">🚫 Anular tarimas que no salieron</button><div id="panel-anular"></div>');
+      contenedor.querySelector(".btn-anular").addEventListener("click", () => abrirAnular(data.camion));
     }
     if (session && session.rol === "cedis") {
       contenedor.insertAdjacentHTML("afterbegin", '<p class="aviso-cedis">Solo ves las tarimas que van a tu CEDIS (' + esc(session.cedis) + ').</p>');
