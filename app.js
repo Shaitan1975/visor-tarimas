@@ -268,7 +268,9 @@ const App = (() => {
       });
     }
 
-    document.getElementById("btn-start-scan").addEventListener("click", iniciarCamara);
+    document.getElementById("btn-start-scan").addEventListener("click", () => { modoTAR = null; iniciarCamara(); });
+    const bLigar = document.getElementById("btn-ligar-tar");
+    if (bLigar) bLigar.addEventListener("click", escanearTAR);
     document.getElementById("btn-cancel-scan").addEventListener("click", cancelarCamara);
     document.getElementById("btn-scan-again").addEventListener("click", () => {
       document.getElementById("send-status").textContent = "";
@@ -420,6 +422,7 @@ const App = (() => {
   }
 
   function cancelarCamara() {
+    modoTAR = null;
     scanning = false;
     if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
     mostrarVista("view-ready");
@@ -439,7 +442,7 @@ const App = (() => {
       if (code && code.data) {
         scanning = false;
         if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-        procesarQR(code.data);
+        if (modoTAR) procesarTAR(code.data); else procesarQR(code.data);
         return;
       }
     }
@@ -515,6 +518,7 @@ const App = (() => {
       }
 
       if (payload.camion) setCamionActual(payload.camion);
+      ultimaSalida = modoSeleccionado === "SALIDA_PLANTA" ? { qr_id: payload.qr_id, sabor: payload.sabor, dc: payload.dc } : null;
       setTimeout(() => mostrarExito(datos, session), 100);
       if (resp.avisos_almacen && resp.avisos_almacen.length) {
         setTimeout(() => alert("✅ Tarima registrada, pero Almacén NO recibió:\n\n" +
@@ -550,7 +554,41 @@ const App = (() => {
         : (datos.lote || datos.l || "-");
     document.getElementById("meta-tarima").textContent = datos.num_tarima || datos.t || "-";
     document.getElementById("meta-po").textContent = datos.po || "-";
+    const bt = document.getElementById("btn-ligar-tar");
+    if (bt) bt.classList.toggle("hidden", !ultimaSalida);
+    const st = document.getElementById("send-status");
+    if (st) { st.textContent = ""; st.className = "send-status"; }
     mostrarVista("view-result");
+  }
+
+  // ── Etiqueta TAR (tarima de producción del Almacén): opcional, después de la salida ──
+  let modoTAR = null, ultimaSalida = null;
+  function escanearTAR() {
+    if (!ultimaSalida) return;
+    modoTAR = ultimaSalida;
+    iniciarCamara();
+  }
+
+  async function procesarTAR(texto) {
+    const destino = modoTAR;
+    modoTAR = null;
+    mostrarVista("view-loading");
+    document.getElementById("loading-text").textContent = "Ligando etiqueta TAR...";
+    let r;
+    try { r = await api("ligar_tar", { qr_id: destino.qr_id, tar: String(texto || "").trim() }, "POST"); }
+    catch (e) { r = { ok: false, error: e.message }; }
+    mostrarVista("view-result");
+    const st = document.getElementById("send-status");
+    if (r.ok) {
+      if (navigator.vibrate) navigator.vibrate(80);
+      st.textContent = "🏷️ " + (r.mensaje || "Etiqueta TAR ligada");
+      st.className = "send-status ok";
+      document.getElementById("btn-ligar-tar").classList.add("hidden");
+    } else {
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      st.textContent = "⚠️ " + r.error + (r.no_coincide ? " — revisa que sea la tarima correcta" : "") + " (la salida sí quedó registrada)";
+      st.className = "send-status error";
+    }
   }
 
   async function actualizarProgresoPantalla() {
@@ -2913,6 +2951,7 @@ window.aplicarCamionATodos = aplicarCamionATodos;
 
 function renderizarAsignacion(resp) {
   const cont = document.getElementById("qr-resumen");
+  const conTAR = (resp.tarimas || []).some(t => t.tar_sugeridas && t.tar_sugeridas.length);
   const tarimas = resp.tarimas || [];
   const noCubiertos = resp.no_cubiertos || [];
   const noAsignados = resp.no_asignados || [];
@@ -2934,6 +2973,7 @@ function renderizarAsignacion(resp) {
     html += '<th style="padding:6px;">Sabor</th>';
     html += '<th style="padding:6px;">Lotes</th>';
     html += '<th style="padding:6px;">PZ</th>';
+    if (conTAR) html += '<th style="padding:6px;">Tomar (TAR)</th>';
     html += '</tr></thead><tbody>';
 
     tarimas.forEach((t, i) => {
@@ -2950,6 +2990,8 @@ function renderizarAsignacion(resp) {
         <td style="padding:6px;text-align:center;">${t.sabor}</td>
         <td style="padding:6px;font-size:11px;">${lotesTxt}</td>
         <td style="padding:6px;text-align:right;font-weight:700;${parcial ? "color:#B45309;" : ""}">${formatearNumero(totalPZ, 0)}${parcial ? " ⚠️" : ""}</td>
+        ${conTAR ? '<td style="padding:6px;font-size:11px;">' + ((t.tar_sugeridas || []).map(x =>
+          '<b>' + x.id + '</b><br><span style="color:#718096;font-size:10px;">Sem ' + x.semana + ' · ' + x.color + ' · ' + formatearNumero(x.pz, 0) + ' PZ</span>').join("<br>") || '<span style="color:#A0AEC0;">—</span>') + '</td>' : ""}
       </tr>`;
     });
     html += '</tbody></table></div>';
