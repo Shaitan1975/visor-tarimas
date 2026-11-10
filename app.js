@@ -1317,12 +1317,16 @@ const App = (() => {
       "<label>Chofer <input id='chofer' placeholder='(opcional)' value='" + esc(lic && lic.chofer || "") + "'></label>" +
       "<label>Licencia del chofer <input id='licf' type='file' accept='image/*'></label>" +
       "<span id='lic-estado' class='lic-estado'>" + (lic ? "🪪 Licencia guardada del camión (" + esc(lic.actualizada) + ")" : "🪪 Sin licencia guardada para este camión") + "</span>" +
+      "<label><input id='dosxhoja' type='checkbox' checked> 2 etiquetas por hoja (misma tarima)</label>" +
       "<label><input id='conpase' type='checkbox' checked> Incluir pase de salida</label>" +
       "<button onclick='window.print()'>🖨️ Imprimir / Guardar PDF</button>" + avisos +
       "<p class='nota'>En el diálogo de impresión: tamaño Carta, márgenes predeterminados, sin encabezados.</p></div>" +
-      r.tarimas.map(etiqueta).join("") + pase +
+      // Cada hoja carta lleva 2 copias de la MISMA tarima (una por lado), con línea de corte
+      r.tarimas.map(t => { const e = etiqueta(t);
+        return '<div class="par"><div class="caja">' + e + '</div><div class="corte"><span>✂ cortar aquí</span></div><div class="caja copia2">' + e + '</div></div>'; }).join("") + pase +
       "<script>" +
       "document.getElementById('cli').oninput=function(){var v=this.value.toUpperCase();document.querySelectorAll('.cli').forEach(function(c){c.textContent=v;});};" +
+      "document.getElementById('dosxhoja').onchange=function(){document.body.classList.toggle('uno',!this.checked);};" +
       "document.getElementById('conpase').onchange=function(){document.querySelector('.pase').classList.toggle('hidden',!this.checked);};" +
       "var CAMION=" + JSON.stringify(r.camion) + ";" +
       "var est=document.getElementById('lic-estado');" +
@@ -1360,8 +1364,18 @@ const App = (() => {
     ".tot{text-align:right;font-weight:bold;font-size:11pt}",
     ".firmas{display:flex;justify-content:space-around;margin-top:0.7in;font-size:9pt;text-align:center}.firmas div{border-top:1px solid #000;width:2.1in;padding-top:4px}",
     ".lic{text-align:center;margin-top:0.4in}.lic img{width:85mm;height:55mm;object-fit:contain;border:1px solid #999}",
-    "@media print{body{background:#fff}.barra{display:none}.etq,.pase{margin:0;box-shadow:none}.etq{width:auto;height:7.7in}}",
-    "@media screen and (max-width:800px){.etq{transform-origin:top left;zoom:0.36}.pase{zoom:0.48}}",
+    // 2 por hoja: carta vertical, cada copia es la etiqueta normal reducida al 66%
+    "@page par{size:letter portrait;margin:0.3in}",
+    ".par{page:par;break-after:page;background:#fff;width:7.9in;height:10.35in;margin:14px auto;display:flex;flex-direction:column;justify-content:space-between;align-items:center}",
+    ".par .caja{width:6.8in;height:5.12in;overflow:hidden;flex:none}",
+    ".par .etq{page:auto;margin:0;break-after:auto;zoom:0.66}",
+    ".corte{width:100%;border-top:1.5px dashed #666;text-align:center;font-size:8pt;color:#666;line-height:0}.corte span{background:#fff;padding:0 6px}",
+    // 1 por hoja (como antes): carta horizontal a tamaño completo
+    "body.uno .par{page:etq;width:auto;height:auto;display:block;margin:0;background:none}",
+    "body.uno .par .caja{width:auto;height:auto;overflow:visible}body.uno .par .etq{zoom:1;margin:14px auto}",
+    "body.uno .copia2,body.uno .corte{display:none}",
+    "@media print{body{background:#fff}.barra{display:none}.etq,.pase,.par{margin:0;box-shadow:none}.etq{width:10.3in;height:7.7in}body.uno .par .etq{width:auto;margin:0}}",
+    "@media screen and (max-width:800px){.par{zoom:0.45}body.uno .par{zoom:0.36}.pase{zoom:0.48}}",
   ].join("\n");
 
   return {
