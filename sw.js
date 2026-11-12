@@ -6,7 +6,7 @@
 // Al publicar cambios: sube el número de CACHE.
 // ═══════════════════════════════════════════════════════════════════
 
-const CACHE = "visor-v30d-20261112";
+const CACHE = "visor-v30e-20261112";
 const ARCHIVOS = [
   "./",
   "./index.html",
