@@ -1285,10 +1285,11 @@ const App = (() => {
         '<tr><td>' + esc(m["class"] || "") + '</td><td colspan="2"><b>SKU:</b> ' + esc(m.sku || "") + '</td></tr>' +
         '<tr><td>' + esc(m.sub || "") + '</td><td colspan="2"><b>UPC:</b> ' + esc(m.upc || "") + '</td></tr>' +
         '<tr><td colspan="3">' + esc(m.sub_class || "") + '</td></tr></table>' +
-        '<div class="ship"><div><b>Location ID:</b> <span class="big">' + esc(m.location_id || ("99" + t.dc)) + '</span></div>' +
-        '<div class="st"><b>Ship To:</b><div>' + esc(m.ship_to_1 || "") + '<br>' + esc(m.ship_to_2 || "") + '<br>' + esc(m.ship_to_3 || "") + '</div></div>' +
-        // Tarima de producción (TAR) que se debe colocar: a la derecha, sin quitar espacio a la etiqueta
+        '<div class="ship"><div class="loc"><div><b>Location ID:</b> <span class="big">' + esc(m.location_id || ("99" + t.dc)) + '</span></div>' +
+        // Tarima de producción (TAR) que se debe colocar: debajo del Location ID, así la dirección conserva su ancho
         (t.tar ? '<div class="tomar">🏷️ TARIMA PRODUCCIÓN<b>' + esc(t.tar).replace(/ \+ /g, "<br>") + '</b></div>' : '') + '</div>' +
+        '<div class="st"><b>Ship To:</b><div>' + esc(m.ship_to_1 || "") + '<br>' + esc(m.ship_to_2 || "") + '<br>' + esc(m.ship_to_3 || "") + '</div></div>' +
+        '</div>' +
         '<div class="pie">' + esc(t.qr_id) + ' · ' + t.lotes.map(l => esc(l.lote) + ' (' + Number(l.pz).toLocaleString("es-MX") + ' pz)').join(", ") + '</div>' +
         '</section>';
     };
@@ -1360,8 +1361,8 @@ const App = (() => {
     ".dat{width:100%;border-collapse:collapse;font-size:18pt;font-weight:bold}.dat td{padding:5px 4px;vertical-align:top}.dat td:first-child{width:48%}.po{font-size:22pt;font-weight:900;white-space:nowrap}",
     ".ship{display:flex;gap:0.3in;align-items:flex-start;font-size:19pt;font-weight:bold;margin-top:auto}.ship .big{font-size:26pt;font-weight:900}.st{display:flex;gap:10px}",
     ".pie{font-size:9pt;color:#444;border-top:1px solid #999;padding-top:3px}",
-    ".ship b{white-space:nowrap}.ship>div:first-child{flex:none;white-space:nowrap}.st{flex:1;min-width:0}.st>div{min-width:0;overflow-wrap:break-word}",
-    ".tomar{flex:none;white-space:nowrap;margin-left:auto;font-size:10pt;border:2px solid #000;border-radius:6px;padding:4px 8px;text-align:center;line-height:1.25}.tomar b{display:block;font-size:14pt}",
+    ".ship b{white-space:nowrap}.ship>.loc{flex:none;white-space:nowrap;display:flex;flex-direction:column;gap:6px}.st{flex:1;min-width:0}.st>div{min-width:0;overflow-wrap:break-word}",
+    ".tomar{align-self:flex-start;white-space:nowrap;font-size:10pt;border:2px solid #000;border-radius:6px;padding:4px 8px;text-align:center;line-height:1.25}.tomar b{display:block;font-size:14pt}",
     ".pase{page:pase;background:#fff;width:7.7in;margin:14px auto;padding:0.2in;font-size:10pt}",
     ".pase-enc{display:flex;justify-content:space-between;margin-bottom:10px;font-size:10pt}",
     ".tpase{width:100%;border-collapse:collapse;font-size:9pt}.tpase th{background:#666;color:#fff}.tpase th,.tpase td{border:1px solid #888;padding:5px 3px;text-align:center}",
